@@ -98,19 +98,20 @@ namespace Career_Tracker_Backend.Controllers
             {
                 // Call the service to delete the user
                 var result = await _userService.DeleteUserAsync(userId);
-
                 if (result)
                 {
                     return Ok(new { message = "User deleted successfully." });
                 }
                 else
                 {
-                    return BadRequest(new { message = "Failed to delete user." });
+                    // Return 404 if the user is not found
+                    return NotFound(new { message = "User not found in the local database." });
                 }
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = ex.Message });
+                // Return the full exception message for debugging
+                return StatusCode(500, new { message = ex.Message, details = ex.ToString() });
             }
         }
     }

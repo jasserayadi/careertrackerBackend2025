@@ -11,5 +11,6 @@ namespace Career_Tracker_Backend.Services.UserServices
         Task<List<User>> GetUsersAsync();
         Task<User> GetUserByUsernameAsync(string username);
         Task<bool> DeleteUserAsync(int userId);
+
     }
 }

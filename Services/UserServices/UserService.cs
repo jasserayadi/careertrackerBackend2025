@@ -109,17 +109,22 @@ namespace Career_Tracker_Backend.Services.UserServices
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // Find user
+                // Find user in local database
                 var user = await _context.Users.Include(u => u.CV).FirstOrDefaultAsync(u => u.UserId == userId);
                 if (user == null)
                     throw new Exception("User not found in the local database.");
 
-                // Delete user in Moodle
-                var moodleUserDeleted = await _moodleService.DeleteMoodleUserAsync(new List<int> { userId });
+                // Retrieve the Moodle user by email
+                var moodleUserId = await _moodleService.GetMoodleUserIdByEmailAsync(user.Email);
+                if (moodleUserId == null)
+                    throw new Exception("User not found in Moodle.");
+
+                // Delete the Moodle user
+                var moodleUserDeleted = await _moodleService.DeleteMoodleUserAsync(new List<int> { moodleUserId.Value });
                 if (!moodleUserDeleted)
                     throw new Exception("Failed to delete user in Moodle.");
 
-                // Delete user's CV file if exists
+                // Delete user's CV file if it exists
                 if (user.CV != null && !string.IsNullOrEmpty(user.CV.CvFile))
                 {
                     var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", user.CV.CvFile);
@@ -127,11 +132,12 @@ namespace Career_Tracker_Backend.Services.UserServices
                         File.Delete(filePath);
                 }
 
-                // Remove user from database
+                // Remove user from the local database
                 _context.Users.Remove(user);
                 await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
 
+                // Commit transaction
+                await transaction.CommitAsync();
                 return true;
             }
             catch (Exception ex)
@@ -141,7 +147,6 @@ namespace Career_Tracker_Backend.Services.UserServices
                 return false;
             }
         }
-
 
 
 
