@@ -46,7 +46,6 @@ namespace Career_Tracker_Backend.Models
 
         public Job? Job { get; set; } // Nullable
 
-
         public ICollection<Inscription>? Inscriptions { get; set; } = new List<Inscription>();
         public ICollection<Feedback>? Feedbacks { get; set; } = new List<Feedback>();
         public ICollection<Certificat>? Certificats { get; set; } = new List<Certificat>();

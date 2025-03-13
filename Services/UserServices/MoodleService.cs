@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
-using System.Text.Json.Serialization;
 
 namespace Career_Tracker_Backend.Services.UserServices
 {
@@ -77,52 +76,5 @@ namespace Career_Tracker_Backend.Services.UserServices
             [JsonProperty("warnings")]
             public List<string> Warnings { get; set; }
         }
-        public async Task<int?> GetMoodleUserIdByEmailAsync(string email)
-        {
-            var moodleUrl = "http://localhost/Mymoodle/webservice/rest/server.php";
-            var moodleToken = "aba8b4d828c431ef68123b83f5a9cba8";
-
-            var formData = new List<KeyValuePair<string, string>>
-    {
-        new KeyValuePair<string, string>("wstoken", moodleToken),
-        new KeyValuePair<string, string>("wsfunction", "core_user_get_users"),
-        new KeyValuePair<string, string>("moodlewsrestformat", "json"),
-        new KeyValuePair<string, string>("criteria[0][key]", "email"),
-        new KeyValuePair<string, string>("criteria[0][value]", email)
-    };
-
-            var content = new FormUrlEncodedContent(formData);
-            var response = await _httpClient.PostAsync(moodleUrl, content);
-            var responseContent = await response.Content.ReadAsStringAsync();
-
-            if (response.IsSuccessStatusCode)
-            {
-                // Deserialize Moodle response to get user ID
-                var moodleUsers = JsonConvert.DeserializeObject<MoodleGetUsersResponse>(responseContent);
-                var moodleUser = moodleUsers?.Users.FirstOrDefault();
-                return moodleUser?.Id;
-            }
-            else
-            {
-                throw new Exception($"Failed to retrieve user from Moodle. Response: {responseContent}");
-            }
-        }
-
-        // Define a class for deserializing the Moodle response
-        public class MoodleGetUsersResponse
-        {
-            [JsonProperty("users")]
-            public List<MoodleUser> Users { get; set; }
-        }
-
-        public class MoodleUser
-        {
-            [JsonProperty("id")]
-            public int Id { get; set; }
-
-            [JsonProperty("email")]
-            public string Email { get; set; }
-        }
-
     }
 }
