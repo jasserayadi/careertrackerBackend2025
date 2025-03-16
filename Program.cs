@@ -8,6 +8,10 @@ using Career_Tracker_Backend.Services;
 using Career_Tracker_Backend.Services.JobService;
 using Microsoft.Extensions.FileProviders;
 using System.Text.Json.Serialization;
+using Career_Tracker_Backend.Services.FormationService;
+using Career_Tracker_Backend.Services.CourseService;
+using Career_Tracker_Backend.Controllers;
+using Career_Tracker_Backend.Services.QuizService;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,12 +64,14 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddHttpClient<IMoodleService, MoodleService>();
 builder.Services.AddScoped<IJobService, JobService>();
-
+builder.Services.AddScoped<IFormationService, FormationService>();
+builder.Services.AddScoped<ICourseService, CourseService>();
+builder.Services.AddScoped<IQuizService, QuizService>();
 // Add Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
+//builder.Services.AddScoped<QuizController>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

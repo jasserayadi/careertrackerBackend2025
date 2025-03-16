@@ -12,7 +12,7 @@ namespace Career_Tracker_Backend
         public DbSet<User> Users { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<Formation> Formations { get; set; }
-        public DbSet<Course> Courses { get; set; }
+        public DbSet<Course> Courses { get; set; } // Ensure this is defined
         public DbSet<Test> Tests { get; set; }
         public DbSet<Question> Questions { get; set; }
         public DbSet<Job> Jobs { get; set; }
@@ -25,10 +25,10 @@ namespace Career_Tracker_Backend
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<Formation>()
+          /*  modelBuilder.Entity<Formation>()
                 .HasMany(f => f.Courses)
                 .WithOne()
-                .HasForeignKey("FormationId");
+                .HasForeignKey("FormationId");*/
 
             modelBuilder.Entity<User>()
                 .HasOne(u => u.Role)
@@ -51,3 +51,6 @@ namespace Career_Tracker_Backend
         }
     }
     }
+
+
+

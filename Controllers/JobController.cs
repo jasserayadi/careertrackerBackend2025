@@ -15,7 +15,6 @@ namespace Career_Tracker_Backend.Controllers
             _jobService = jobService;
         }
 
-     
 
       
 

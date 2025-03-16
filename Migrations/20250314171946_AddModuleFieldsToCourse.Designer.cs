@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Career_Tracker_Backend.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250304003041_MakeColumnsNullable")]
-    partial class MakeColumnsNullable
+    [Migration("20250314171946_AddModuleFieldsToCourse")]
+    partial class AddModuleFieldsToCourse
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -44,15 +44,12 @@ namespace Career_Tracker_Backend.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("CvFile")
-                        .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<string>("Experiences")
-                        .IsRequired()
+                    b.Property<string>("ExperiencesJson")
                         .HasColumnType("longtext");
 
-                    b.Property<string>("Skills")
-                        .IsRequired()
+                    b.Property<string>("SkillsJson")
                         .HasColumnType("longtext");
 
                     b.Property<int>("UserId")
@@ -111,37 +108,53 @@ namespace Career_Tracker_Backend.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    b.Property<string>("Description")
+                    b.Property<string>("Content")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
+                        .HasColumnType("text");
 
-                    b.Property<int>("FormationFk")
-                        .HasColumnType("int");
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<int>("FormationId")
                         .HasColumnType("int");
 
-                    b.Property<int>("FormationId2")
+                    b.Property<string>("ModIcon")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ModName")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ModPurpose")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int?>("MoodleCourseId")
                         .HasColumnType("int");
 
-                    b.Property<int>("MoodleCourseId")
+                    b.Property<int?>("MoodleSectionId")
                         .HasColumnType("int");
 
-                    b.Property<int>("MoodleSectionId")
-                        .HasColumnType("int");
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
 
-                    b.Property<int>("Order")
-                        .HasColumnType("int");
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
 
-                    b.Property<string>("Title")
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Url")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)");
 
                     b.HasKey("CourseId");
-
-                    b.HasIndex("FormationFk");
 
                     b.HasIndex("FormationId");
 
@@ -175,16 +188,16 @@ namespace Career_Tracker_Backend.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    b.Property<int>("CategoryFk")
+                    b.Property<int?>("CategoryFk")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<string>("Description")
+                    b.Property<string>("Fullname")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
 
                     b.Property<int>("MoodleCategoryId")
                         .HasColumnType("int");
@@ -192,10 +205,14 @@ namespace Career_Tracker_Backend.Migrations
                     b.Property<int>("MoodleCourseId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Title")
+                    b.Property<string>("Shortname")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("varchar(10000)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime(6)");
@@ -334,7 +351,8 @@ namespace Career_Tracker_Backend.Migrations
                         .HasColumnType("int");
 
                     b.Property<DateTimeOffset?>("DateCreation")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("date_creation");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -423,12 +441,6 @@ namespace Career_Tracker_Backend.Migrations
             modelBuilder.Entity("Career_Tracker_Backend.Models.Course", b =>
                 {
                     b.HasOne("Career_Tracker_Backend.Models.Formation", "Formation")
-                        .WithMany()
-                        .HasForeignKey("FormationFk")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Career_Tracker_Backend.Models.Formation", null)
                         .WithMany("Courses")
                         .HasForeignKey("FormationId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -452,9 +464,7 @@ namespace Career_Tracker_Backend.Migrations
                 {
                     b.HasOne("Career_Tracker_Backend.Models.Category", "Category")
                         .WithMany()
-                        .HasForeignKey("CategoryFk")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("CategoryFk");
 
                     b.Navigation("Category");
                 });
@@ -547,8 +557,7 @@ namespace Career_Tracker_Backend.Migrations
 
             modelBuilder.Entity("Career_Tracker_Backend.Models.Course", b =>
                 {
-                    b.Navigation("Test")
-                        .IsRequired();
+                    b.Navigation("Test");
                 });
 
             modelBuilder.Entity("Career_Tracker_Backend.Models.Formation", b =>
@@ -574,8 +583,7 @@ namespace Career_Tracker_Backend.Migrations
 
             modelBuilder.Entity("Career_Tracker_Backend.Models.User", b =>
                 {
-                    b.Navigation("CV")
-                        .IsRequired();
+                    b.Navigation("CV");
 
                     b.Navigation("Certificats");
 

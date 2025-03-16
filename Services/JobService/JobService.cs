@@ -4,7 +4,7 @@ using static Career_Tracker_Backend.Models.DTO;
 
 namespace Career_Tracker_Backend.Services.JobService
 {
-    public class JobService:IJobService
+    public class JobService : IJobService
     {
         private readonly ApplicationDbContext _context;
 

@@ -10,14 +10,15 @@ namespace Career_Tracker_Backend.Models
 
         [Required]
         [MaxLength(200)]
-        public string Title { get; set; } // Formation title
+        public string Fullname { get; set; } // Formation title
+        public string Shortname { get; set; } // Formation title
 
-        [MaxLength(1000)]
-        public string Description { get; set; } // Formation description
+        [MaxLength(10000)]
+        public string Summary { get; set; } // Formation description
 
         // Moodle-specific fields
 
-        public int MoodleCategoryId { get; set; } // Maps to Moodle's course category ID
+        public int MoodleCategoryId  { get; set; } // Maps to Moodle's course category ID
 
 
         public int MoodleCourseId { get; set; } // Maps to Moodle's parent course ID (if applicable)
@@ -28,13 +29,13 @@ namespace Career_Tracker_Backend.Models
 
         // Relationships
         [ForeignKey("CategoryFk")]
-        public virtual Category Category { get; set; }
+        public virtual Category?Category { get; set; }
 
+          
 
+        public virtual ICollection<Course>?Courses { get; set; } // One-to-many with Course (levels)
 
-        public virtual ICollection<Course> Courses { get; set; } // One-to-many with Course (levels)
-
-        public virtual ICollection<User> Users { get; set; } // Navigation property
+        public virtual ICollection<User>? Users { get; set; } // Navigation property
      
     }
 }

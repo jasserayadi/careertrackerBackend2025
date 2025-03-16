@@ -22,5 +22,6 @@ namespace Career_Tracker_Backend.Models
         // Navigation properties
         public Course Course { get; set; } // Navigation property
         public ICollection<Question> Questions { get; set; } = new List<Question>(); // One-to-many with Question
+
     }
 }
