@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using Career_Tracker_Backend.Models;
 using Microsoft.EntityFrameworkCore;
 using HtmlAgilityPack;
+using System.Text.Json;
 
 namespace Career_Tracker_Backend.Services.UserServices
 {
@@ -225,7 +226,10 @@ namespace Career_Tracker_Backend.Services.UserServices
                             QuestionType = q.Type,
                             Rate = q.Answers?.FirstOrDefault()?.Fraction ?? 0,
                             QuestionNumber = q.Id.ToString(),
-                            HtmlContent = q.Html
+                            HtmlContent = q.Html,
+                            QuestionText = q.QuestionText, // Map extracted QuestionText
+                            CorrectAnswer = q.CorrectAnswer, // Map extracted CorrectAnswer
+                            ChoicesJson = System.Text.Json.JsonSerializer.Serialize(q.Choices)
                         }).ToList()
                     };
 
@@ -290,12 +294,12 @@ namespace Career_Tracker_Backend.Services.UserServices
             var moodleToken = "aba8b4d828c431ef68123b83f5a9cba8"; // Replace with your Moodle token
 
             var formData = new List<KeyValuePair<string, string>>
-        {
-            new KeyValuePair<string, string>("wstoken", moodleToken),
-            new KeyValuePair<string, string>("wsfunction", "mod_quiz_get_attempt_review"),
-            new KeyValuePair<string, string>("moodlewsrestformat", "json"),
-            new KeyValuePair<string, string>("attemptid", attemptId.ToString())
-        };
+    {
+        new KeyValuePair<string, string>("wstoken", moodleToken),
+        new KeyValuePair<string, string>("wsfunction", "mod_quiz_get_attempt_review"),
+        new KeyValuePair<string, string>("moodlewsrestformat", "json"),
+        new KeyValuePair<string, string>("attemptid", attemptId.ToString())
+    };
 
             var content = new FormUrlEncodedContent(formData);
             var response = await _httpClient.PostAsync(moodleUrl, content);
@@ -304,13 +308,70 @@ namespace Career_Tracker_Backend.Services.UserServices
             if (response.IsSuccessStatusCode)
             {
                 var attemptReview = JsonConvert.DeserializeObject<MoodleQuizAttemptReview>(responseContent);
-                return attemptReview?.Questions ?? new List<MoodleQuestion>();
+                var questions = attemptReview?.Questions ?? new List<MoodleQuestion>();
+
+                // Parse each question to extract QuestionText, CorrectAnswer, and Choices
+                foreach (var question in questions)
+                {
+                    _logger.LogInformation($"HTML Content for Question ID {question.Id}: {question.Html}");
+                    question.QuestionText = ExtractQuestionText(question.Html);
+                    question.CorrectAnswer = ExtractCorrectAnswer(question.Html);
+                    question.Choices = ExtractChoices(question.Html);
+
+                    // Log the extracted choices for debugging
+                    _logger.LogInformation($"Question ID: {question.Id}, Choices: {System.Text.Json.JsonSerializer.Serialize(question.Choices)}");
+                }
+
+                return questions;
             }
             else
             {
                 _logger.LogError($"Failed to retrieve questions for quiz ID {quizId}, attempt ID {attemptId}. Response: {responseContent}");
                 throw new Exception($"Failed to retrieve questions for quiz ID {quizId}, attempt ID {attemptId}. Response: {responseContent}");
             }
+        }
+        private string ExtractQuestionText(string htmlContent)
+{
+    var htmlDoc = new HtmlDocument();
+    htmlDoc.LoadHtml(htmlContent);
+
+    var questionTextNode = htmlDoc.DocumentNode.SelectSingleNode(".//div[contains(@class, 'qtext')]");
+    return questionTextNode?.InnerText.Trim() ?? string.Empty;
+}
+
+private string ExtractCorrectAnswer(string htmlContent)
+{
+    var htmlDoc = new HtmlDocument();
+    htmlDoc.LoadHtml(htmlContent);
+
+    var correctAnswerNode = htmlDoc.DocumentNode.SelectSingleNode(".//div[contains(@class, 'rightanswer')]");
+    return correctAnswerNode?.InnerText.Trim() ?? string.Empty;
+}
+
+        private List<string> ExtractChoices(string htmlContent)
+        {
+            var htmlDoc = new HtmlDocument();
+            htmlDoc.LoadHtml(htmlContent);
+
+            var choices = new List<string>();
+            var choiceNodes = htmlDoc.DocumentNode.SelectNodes(".//div[contains(@class, 'answer')]//label");
+
+            if (choiceNodes != null)
+            {
+                _logger.LogInformation($"Found {choiceNodes.Count} choices in the HTML content.");
+                foreach (var choiceNode in choiceNodes)
+                {
+                    var choiceText = choiceNode.InnerText.Trim();
+                    _logger.LogInformation($"Choice: {choiceText}");
+                    choices.Add(choiceText);
+                }
+            }
+            else
+            {
+                _logger.LogWarning("No choices found in the HTML content.");
+            }
+
+            return choices;
         }
         public QuizQuestionDetail ParseHtmlContent(string htmlContent)
         {
@@ -401,13 +462,7 @@ namespace Career_Tracker_Backend.Services.UserServices
         {
             public List<MoodleQuestion> Questions { get; set; }
         }
-        public class MoodleQuestion
-        {
-            public int Id { get; set; }
-            public string Html { get; set; }
-            public string Type { get; set; }
-            public List<MoodleAnswer> Answers { get; set; }
-        }
+    
         public class MoodleAnswer
         {
             public float Fraction { get; set; }
@@ -541,6 +596,17 @@ namespace Career_Tracker_Backend.Services.UserServices
             public int Groupmode { get; set; }
             public List<MoodleContent> Contents { get; set; }
         }
+        public class MoodleQuestion
+        {
+            public int Id { get; set; }
+            public string Type { get; set; }
+            public string Html { get; set; }
+            public List<MoodleAnswer> Answers { get; set; }
 
+            // Add these properties
+            public string QuestionText { get; set; }
+            public string CorrectAnswer { get; set; }
+            public List<string> Choices { get; set; }
+        }
     }
 }
