@@ -55,5 +55,6 @@ namespace Career_Tracker_Backend.Models
         {
             return Password == password; // Replace with hashed password verification
         }
+        public int? MoodleUserId { get; set; } // Nullable by mysql command
     }
 }

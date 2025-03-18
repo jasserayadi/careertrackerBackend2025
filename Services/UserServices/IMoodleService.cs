@@ -12,6 +12,6 @@ namespace Career_Tracker_Backend.Services.UserServices
              Task SaveQuizDataAsync(int courseId, int userId);
          Task<List<MoodleQuiz>> GetQuizzesByCourseAsync(int courseId);
         QuizQuestionDetail ParseHtmlContent(string htmlContent);
-
+        Task<List<MoodleEnrolledUser>> GetEnrolledUsersAsync(int courseId);
           }
 }

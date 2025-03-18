@@ -35,7 +35,7 @@ public class Question
 
     public string? CorrectAnswer { get; set; } // Match MySQL text (nullable)
 
-    [NotMapped] // Not mapped to the database
+    [NotMapped]
     public List<string> Choices
     {
         get => string.IsNullOrEmpty(ChoicesJson) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(ChoicesJson);

@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Career_Tracker_Backend.Services.QuizService;
 using static Career_Tracker_Backend.Services.UserServices.MoodleService;
+using Career_Tracker_Backend.Models;
 
 public class QuizService: IQuizService
 {
@@ -59,4 +60,5 @@ public class QuizService: IQuizService
 
         return quizDetails;
     }
+ 
 }

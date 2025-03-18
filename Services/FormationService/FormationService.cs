@@ -42,6 +42,15 @@ public class FormationService : IFormationService
                 // Add to database
                 _context.Formations.Add(formation);
             }
+            else
+            {
+                // Update existing formation
+                existingFormation.Fullname = moodleCourse.Fullname;
+                existingFormation.Shortname = moodleCourse.Shortname;
+                existingFormation.Summary = moodleCourse.Summary;
+                existingFormation.MoodleCategoryId = moodleCourse.Categoryid;
+                existingFormation.UpdatedAt = DateTime.UtcNow;
+            }
         }
 
         // Save changes
