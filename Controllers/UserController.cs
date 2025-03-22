@@ -113,5 +113,32 @@ namespace Career_Tracker_Backend.Controllers
                 return StatusCode(500, new { message = ex.Message });
             }
         }
+
+        [HttpGet("id/{id:int}")]
+        public async Task<ActionResult<User>> GetUserById(int id)
+        {
+            try
+            {
+                var user = await _userService.GetUserByIdAsync(id);
+                return Ok(user);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+        [HttpGet("completion/{userId}/{courseId}")]
+        public async Task<IActionResult> GetUserCourseCompletionStatus(int userId, int courseId)
+        {
+            try
+            {
+                var completionStatus = await _userService.GetUserCourseCompletionStatusAsync(userId, courseId);
+                return Ok(completionStatus);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
     }
 }

@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using static Career_Tracker_Backend.Services.UserServices.MoodleService;
+using static Career_Tracker_Backend.Services.UserServices.UserService;
 
 namespace Career_Tracker_Backend.Services.UserServices
 {
@@ -11,5 +13,7 @@ namespace Career_Tracker_Backend.Services.UserServices
         Task<List<User>> GetUsersAsync();
         Task<User> GetUserByUsernameAsync(string username);
         Task<bool> DeleteUserAsync(int userId);
+        Task<User> GetUserByIdAsync(int userId);
+        Task<MoodleCompletionStatus> GetUserCourseCompletionStatusAsync(int userId, int courseId);
     }
 }

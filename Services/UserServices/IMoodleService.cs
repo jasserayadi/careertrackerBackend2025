@@ -1,4 +1,5 @@
 ﻿
+using Career_Tracker_Backend.Models;
 using static Career_Tracker_Backend.Services.UserServices.MoodleService;
 
 namespace Career_Tracker_Backend.Services.UserServices
@@ -13,5 +14,7 @@ namespace Career_Tracker_Backend.Services.UserServices
          Task<List<MoodleQuiz>> GetQuizzesByCourseAsync(int courseId);
         QuizQuestionDetail ParseHtmlContent(string htmlContent);
         Task<List<MoodleEnrolledUser>> GetEnrolledUsersAsync(int courseId);
+        Task<List<MoodleUser>> GetUsersByFieldAsync(string field, List<string> values);
+        Task<MoodleCompletionStatus> GetCourseCompletionStatusAsync(int userId, int courseId);
           }
 }

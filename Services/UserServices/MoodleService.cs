@@ -169,134 +169,134 @@ namespace Career_Tracker_Backend.Services.UserServices
         }
 
         public async Task SaveQuizDataAsync(int courseId, int userId)
-{
-    try
-    {
-        _logger.LogInformation($"Fetching quizzes for course ID: {courseId}");
-        var quizzes = await GetQuizzesByCourseAsync(courseId);
-
-        if (quizzes == null || quizzes.Count == 0)
         {
-            _logger.LogWarning($"No quizzes found for course ID {courseId}.");
-            return;
-        }
-
-        _logger.LogInformation($"Found {quizzes.Count} quizzes for course ID: {courseId}");
-
-        foreach (var quiz in quizzes)
-        {
-            _logger.LogInformation($"Fetching attempts for quiz ID: {quiz.Id}, user ID: {userId}");
-            var attempts = await GetUserAttemptsAsync(quiz.Id, userId);
-
-            if (attempts == null || attempts.Count == 0)
+            try
             {
-                _logger.LogWarning($"No attempts found for quiz ID {quiz.Id}, user ID {userId}.");
-                continue;
-            }
+                _logger.LogInformation($"Fetching quizzes for course ID: {courseId}");
+                var quizzes = await GetQuizzesByCourseAsync(courseId);
 
-            _logger.LogInformation($"Found {attempts.Count} attempts for quiz ID: {quiz.Id}");
-
-            var mostRecentAttempt = attempts.OrderByDescending(a => a.AttemptId).FirstOrDefault();
-
-            if (mostRecentAttempt == null)
-            {
-                _logger.LogWarning($"No recent attempt found for quiz ID {quiz.Id}, user ID {userId}.");
-                continue;
-            }
-
-            _logger.LogInformation($"Fetching questions for quiz ID: {quiz.Id}, attempt ID: {mostRecentAttempt.AttemptId}");
-            var questions = await GetQuizQuestionsAsync(quiz.Id, mostRecentAttempt.AttemptId);
-
-            if (questions == null || questions.Count == 0)
-            {
-                _logger.LogWarning($"No questions found for quiz ID {quiz.Id}, attempt ID {mostRecentAttempt.AttemptId}.");
-                continue;
-            }
-
-            _logger.LogInformation($"Found {questions.Count} questions for quiz ID: {quiz.Id}");
-
-            // Check if the test already exists in the database
-            var existingTest = await _context.Tests
-                .Include(t => t.Questions) // Include related questions
-                .FirstOrDefaultAsync(t => t.MoodleQuizId == quiz.Id && t.CourseId == courseId);
-
-            if (existingTest == null)
-            {
-                // Create a new Test entity if it doesn't exist
-                var test = new Test
+                if (quizzes == null || quizzes.Count == 0)
                 {
-                    MoodleQuizId = quiz.Id,
-                    Title = quiz.Name,
-                    Description = quiz.Intro,
-                    CourseId = courseId,
-                    Questions = questions.Select(q => new Question
-                    {
-                        Text = q.Html.Length > 2000 ? q.Html.Substring(0, 2000) : q.Html, // Truncate if necessary
-                        QuestionType = q.Type,
-                        Rate = q.Answers?.FirstOrDefault()?.Fraction ?? 0,
-                        QuestionNumber = q.Id.ToString(),
-                        HtmlContent = q.Html,
-                        QuestionText = q.QuestionText, // Map extracted QuestionText
-                        CorrectAnswer = q.CorrectAnswer, // Map extracted CorrectAnswer
-                        Choices = q.Choices // Assign the Choices property
-                    }).ToList()
-                };
+                    _logger.LogWarning($"No quizzes found for course ID {courseId}.");
+                    return;
+                }
 
-                // Add the Test to the database
-                _context.Tests.Add(test);
-            }
-            else
-            {
-                // Update the existing test and its questions
-                existingTest.Title = quiz.Name;
-                existingTest.Description = quiz.Intro;
-                
+                _logger.LogInformation($"Found {quizzes.Count} quizzes for course ID: {courseId}");
 
-                foreach (var question in questions)
+                foreach (var quiz in quizzes)
                 {
-                    var existingQuestion = existingTest.Questions
-                        .FirstOrDefault(q => q.QuestionNumber == question.Id.ToString());
+                    _logger.LogInformation($"Fetching attempts for quiz ID: {quiz.Id}, user ID: {userId}");
+                    var attempts = await GetUserAttemptsAsync(quiz.Id, userId);
 
-                    if (existingQuestion == null)
+                    if (attempts == null || attempts.Count == 0)
                     {
-                        // Add new question if it doesn't exist
-                        existingTest.Questions.Add(new Question
+                        _logger.LogWarning($"No attempts found for quiz ID {quiz.Id}, user ID {userId}.");
+                        continue;
+                    }
+
+                    _logger.LogInformation($"Found {attempts.Count} attempts for quiz ID: {quiz.Id}");
+
+                    var mostRecentAttempt = attempts.OrderByDescending(a => a.AttemptId).FirstOrDefault();
+
+                    if (mostRecentAttempt == null)
+                    {
+                        _logger.LogWarning($"No recent attempt found for quiz ID {quiz.Id}, user ID {userId}.");
+                        continue;
+                    }
+
+                    _logger.LogInformation($"Fetching questions for quiz ID: {quiz.Id}, attempt ID: {mostRecentAttempt.AttemptId}");
+                    var questions = await GetQuizQuestionsAsync(quiz.Id, mostRecentAttempt.AttemptId);
+
+                    if (questions == null || questions.Count == 0)
+                    {
+                        _logger.LogWarning($"No questions found for quiz ID {quiz.Id}, attempt ID {mostRecentAttempt.AttemptId}.");
+                        continue;
+                    }
+
+                    _logger.LogInformation($"Found {questions.Count} questions for quiz ID: {quiz.Id}");
+
+                    // Check if the test already exists in the database
+                    var existingTest = await _context.Tests
+                        .Include(t => t.Questions) // Include related questions
+                        .FirstOrDefaultAsync(t => t.MoodleQuizId == quiz.Id && t.CourseId == courseId);
+
+                    if (existingTest == null)
+                    {
+                        // Create a new Test entity if it doesn't exist
+                        var test = new Test
                         {
-                            Text = question.Html.Length > 2000 ? question.Html.Substring(0, 2000) : question.Html,
-                            QuestionType = question.Type,
-                            Rate = question.Answers?.FirstOrDefault()?.Fraction ?? 0,
-                            QuestionNumber = question.Id.ToString(),
-                            HtmlContent = question.Html,
-                            QuestionText = question.QuestionText,
-                            CorrectAnswer = question.CorrectAnswer,
-                            Choices = question.Choices
-                        });
+                            MoodleQuizId = quiz.Id,
+                            Title = quiz.Name,
+                            Description = quiz.Intro,
+                            CourseId = courseId,
+                            Questions = questions.Select(q => new Question
+                            {
+                                Text = q.Html.Length > 2000 ? q.Html.Substring(0, 2000) : q.Html, // Truncate if necessary
+                                QuestionType = q.Type,
+                                Rate = q.Answers?.FirstOrDefault()?.Fraction ?? 0,
+                                QuestionNumber = q.Id.ToString(),
+                                HtmlContent = q.Html,
+                                QuestionText = q.QuestionText, // Map extracted QuestionText
+                                CorrectAnswer = q.CorrectAnswer, // Map extracted CorrectAnswer
+                                Choices = q.Choices // Assign the Choices property
+                            }).ToList()
+                        };
+
+                        // Add the Test to the database
+                        _context.Tests.Add(test);
                     }
                     else
                     {
-                        // Update existing question
-                        existingQuestion.Text = question.Html.Length > 2000 ? question.Html.Substring(0, 2000) : question.Html;
-                        existingQuestion.QuestionType = question.Type;
-                        existingQuestion.Rate = question.Answers?.FirstOrDefault()?.Fraction ?? 0;
-                        existingQuestion.HtmlContent = question.Html;
-                        existingQuestion.QuestionText = question.QuestionText;
-                        existingQuestion.CorrectAnswer = question.CorrectAnswer;
-                        existingQuestion.Choices = question.Choices;
+                        // Update the existing test and its questions
+                        existingTest.Title = quiz.Name;
+                        existingTest.Description = quiz.Intro;
+
+
+                        foreach (var question in questions)
+                        {
+                            var existingQuestion = existingTest.Questions
+                                .FirstOrDefault(q => q.QuestionNumber == question.Id.ToString());
+
+                            if (existingQuestion == null)
+                            {
+                                // Add new question if it doesn't exist
+                                existingTest.Questions.Add(new Question
+                                {
+                                    Text = question.Html.Length > 2000 ? question.Html.Substring(0, 2000) : question.Html,
+                                    QuestionType = question.Type,
+                                    Rate = question.Answers?.FirstOrDefault()?.Fraction ?? 0,
+                                    QuestionNumber = question.Id.ToString(),
+                                    HtmlContent = question.Html,
+                                    QuestionText = question.QuestionText,
+                                    CorrectAnswer = question.CorrectAnswer,
+                                    Choices = question.Choices
+                                });
+                            }
+                            else
+                            {
+                                // Update existing question
+                                existingQuestion.Text = question.Html.Length > 2000 ? question.Html.Substring(0, 2000) : question.Html;
+                                existingQuestion.QuestionType = question.Type;
+                                existingQuestion.Rate = question.Answers?.FirstOrDefault()?.Fraction ?? 0;
+                                existingQuestion.HtmlContent = question.Html;
+                                existingQuestion.QuestionText = question.QuestionText;
+                                existingQuestion.CorrectAnswer = question.CorrectAnswer;
+                                existingQuestion.Choices = question.Choices;
+                            }
+                        }
                     }
                 }
+
+                // Save changes to the database
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Quiz data saved successfully.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error saving quiz data: {ex.Message}");
+                throw;
             }
         }
-
-        // Save changes to the database
-        await _context.SaveChangesAsync();
-        _logger.LogInformation("Quiz data saved successfully.");
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError($"Error saving quiz data: {ex.Message}");
-        throw;
-    }
-}
 
         private async Task<List<MoodleQuizAttempt>> GetUserAttemptsAsync(int quizId, int userId)
         {
@@ -383,22 +383,22 @@ namespace Career_Tracker_Backend.Services.UserServices
             }
         }
         private string ExtractQuestionText(string htmlContent)
-{
-    var htmlDoc = new HtmlDocument();
-    htmlDoc.LoadHtml(htmlContent);
+        {
+            var htmlDoc = new HtmlDocument();
+            htmlDoc.LoadHtml(htmlContent);
 
-    var questionTextNode = htmlDoc.DocumentNode.SelectSingleNode(".//div[contains(@class, 'qtext')]");
-    return questionTextNode?.InnerText.Trim() ?? string.Empty;
-}
+            var questionTextNode = htmlDoc.DocumentNode.SelectSingleNode(".//div[contains(@class, 'qtext')]");
+            return questionTextNode?.InnerText.Trim() ?? string.Empty;
+        }
 
-private string ExtractCorrectAnswer(string htmlContent)
-{
-    var htmlDoc = new HtmlDocument();
-    htmlDoc.LoadHtml(htmlContent);
+        private string ExtractCorrectAnswer(string htmlContent)
+        {
+            var htmlDoc = new HtmlDocument();
+            htmlDoc.LoadHtml(htmlContent);
 
-    var correctAnswerNode = htmlDoc.DocumentNode.SelectSingleNode(".//div[contains(@class, 'rightanswer')]");
-    return correctAnswerNode?.InnerText.Trim() ?? string.Empty;
-}
+            var correctAnswerNode = htmlDoc.DocumentNode.SelectSingleNode(".//div[contains(@class, 'rightanswer')]");
+            return correctAnswerNode?.InnerText.Trim() ?? string.Empty;
+        }
 
         private List<string> ExtractChoices(string htmlContent)
         {
@@ -535,7 +535,7 @@ private string ExtractCorrectAnswer(string htmlContent)
         {
             public List<MoodleQuestion> Questions { get; set; }
         }
-    
+
         public class MoodleAnswer
         {
             public float Fraction { get; set; }
@@ -701,34 +701,101 @@ private string ExtractCorrectAnswer(string htmlContent)
             if (response.IsSuccessStatusCode)
             {
                 var enrolledUsers = JsonConvert.DeserializeObject<List<MoodleEnrolledUser>>(responseContent);
-                _logger.LogInformation("Moodle API Response: {Response}", responseContent); // Log the response
                 return enrolledUsers;
             }
             else
             {
-                _logger.LogError("Failed to retrieve enrolled users for course ID {CourseId}. Response: {Response}", courseId, responseContent);
-                throw new Exception($"Failed to retrieve enrolled users for course ID {courseId}. Response: {responseContent}");
+                throw new Exception($"Failed to retrieve enrolled users from Moodle. Response: {responseContent}");
             }
         }
         public class MoodleEnrolledUser
         {
             [JsonProperty("id")]
-            public int Id { get; set; } // Moodle user ID
+            public int Id { get; set; }
 
             [JsonProperty("username")]
             public string Username { get; set; }
+
+            [JsonProperty("firstname")]
+            public string Firstname { get; set; }
+
+            [JsonProperty("lastname")]
+            public string Lastname { get; set; }
+
+            [JsonProperty("email")]
+            public string Email { get; set; }
+
+            [JsonProperty("enrolledsince")]
+            public long EnrolledSince { get; set; } // Unix timestamp
+        }
+        public async Task<List<MoodleUser>> GetUsersByFieldAsync(string field, List<string> values)
+        {
+            if (string.IsNullOrEmpty(field))
+            {
+                throw new ArgumentException("Field cannot be null or empty.");
+            }
+
+            if (values == null || values.Count == 0)
+            {
+                throw new ArgumentException("Values cannot be null or empty.");
+            }
+
+            var moodleUrl = "http://localhost/Mymoodle/webservice/rest/server.php";
+            var moodleToken = "aba8b4d828c431ef68123b83f5a9cba8";
+
+            var formData = new List<KeyValuePair<string, string>>
+        {
+            new KeyValuePair<string, string>("wstoken", moodleToken),
+            new KeyValuePair<string, string>("wsfunction", "core_user_get_users_by_field"),
+            new KeyValuePair<string, string>("field", field),
+            new KeyValuePair<string, string>("moodlewsrestformat", "json")
+        };
+
+            // Add values to the form data
+            for (int i = 0; i < values.Count; i++)
+            {
+                formData.Add(new KeyValuePair<string, string>($"values[{i}]", values[i]));
+            }
+
+            var content = new FormUrlEncodedContent(formData);
+            var response = await _httpClient.PostAsync(moodleUrl, content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Check if the response is an error object
+                if (responseContent.Contains("\"exception\""))
+                {
+                    // Handle Moodle API error
+                    var errorResponse = JsonConvert.DeserializeObject<MoodleErrorResponse>(responseContent);
+                    throw new Exception($"Moodle API Error: {errorResponse.Message} (Code: {errorResponse.ErrorCode})");
+                }
+
+                // Deserialize the response as a list of MoodleUser objects
+                var moodleUsers = JsonConvert.DeserializeObject<List<MoodleUser>>(responseContent);
+                return moodleUsers;
+            }
+            else
+            {
+                throw new Exception($"Failed to retrieve users from Moodle. Response: {responseContent}");
+            }
+        }
+        public class MoodleUser
+        {
+            [JsonProperty("id")]
+            public int Id { get; set; } // Moodle's user ID
+
+            [JsonProperty("username")]
+            public string Username { get; set; }
+
+            [JsonProperty("email")]
+            public string Email { get; set; }
 
             [JsonProperty("firstname")]
             public string FirstName { get; set; }
 
             [JsonProperty("lastname")]
             public string LastName { get; set; }
-
-            [JsonProperty("email")]
-            public string Email { get; set; }
-
-            [JsonProperty("enrolledcourses")]
-            public List<MoodleEnrolledCourse> EnrolledCourses { get; set; } // List of enrolled courses
         }
 
         public class MoodleEnrolledCourse
@@ -744,6 +811,96 @@ private string ExtractCorrectAnswer(string htmlContent)
 
             [JsonProperty("timecreated")]
             public long TimeCreated { get; set; } // Enrollment timestamp
+        }
+
+
+
+
+
+        public async Task<int?> GetMoodleUserIdAsync(int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            return user?.MoodleUserId;
+        }
+        public async Task<MoodleCompletionStatus> GetCourseCompletionStatusAsync(int userId, int courseId)
+        {
+            var moodleUserId = await GetMoodleUserIdAsync(userId);
+            if (moodleUserId == null)
+            {
+                throw new Exception("Moodle user ID not found for the given user.");
+            }
+
+            var moodleUrl = "http://localhost/Mymoodle/webservice/rest/server.php";
+            var moodleToken = "aba8b4d828c431ef68123b83f5a9cba8";
+
+            var content = new FormUrlEncodedContent(new[]
+            {
+        new KeyValuePair<string, string>("wstoken", moodleToken),
+        new KeyValuePair<string, string>("wsfunction", "core_completion_get_course_completion_status"),
+        new KeyValuePair<string, string>("moodlewsrestformat", "json"),
+        new KeyValuePair<string, string>("userid", moodleUserId.ToString()), // Use moodleUserId here
+        new KeyValuePair<string, string>("courseid", courseId.ToString()),
+    });
+
+            var response = await _httpClient.PostAsync(moodleUrl, content);
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var completionStatus = JsonConvert.DeserializeObject<MoodleCompletionStatus>(responseContent);
+
+                if (completionStatus?.CompletionStatus == null)
+                {
+                    throw new Exception("Completion status data is null or invalid.");
+                }
+
+                int totalActivities = completionStatus.CompletionStatus.Completions?.Count ?? 0;
+                int completedActivities = completionStatus.CompletionStatus.Completions?.Count(a => a.Complete) ?? 0;
+
+                double percentageCompletion = totalActivities > 0 ? (double)completedActivities / totalActivities * 100 : 0;
+                completionStatus.CompletionStatus.PercentageCompletion = percentageCompletion;
+
+                return completionStatus;
+            }
+            else
+            {
+                throw new Exception($"Failed to fetch course completion status. Response: {response.StatusCode}");
+            }
+        }
+        public class MoodleCompletionStatus
+        {
+            public CompletionStatus CompletionStatus { get; set; }
+            public List<Warning> Warnings { get; set; }
+        }
+
+        public class CompletionStatus
+        {
+            public bool Completed { get; set; }
+            public int Aggregation { get; set; }
+            public List<Completion> Completions { get; set; }
+            public double PercentageCompletion { get; set; }
+        }
+
+        public class Completion
+        {
+            public int Type { get; set; }
+            public string Title { get; set; }
+            public string Status { get; set; }
+            public bool Complete { get; set; }
+            public long? TimeCompleted { get; set; }
+            public Details Details { get; set; }
+        }
+
+        public class Details
+        {
+            public string Type { get; set; }
+            public string Criteria { get; set; }
+            public string Requirement { get; set; }
+            public string Status { get; set; }
+        }
+
+        public class Warning
+        {
+            public string Message { get; set; }
         }
     }
 }

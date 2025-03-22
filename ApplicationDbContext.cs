@@ -42,6 +42,14 @@ namespace Career_Tracker_Backend
                 .HasOne(c => c.User)
                 .WithMany(u => u.Certificats)
                 .HasForeignKey(c => c.UserId);
+            modelBuilder.Entity<User>()
+       .HasMany(u => u.Formations)
+       .WithMany(f => f.Users)
+       .UsingEntity<Dictionary<string, object>>(
+           "FormationUser",
+           j => j.HasOne<Formation>().WithMany().HasForeignKey("FormationId"),
+           j => j.HasOne<User>().WithMany().HasForeignKey("UserId"),
+           j => j.ToTable("FormationUser"));
 
             // Supprimez cette relation si elle existe
             // modelBuilder.Entity<Category>()

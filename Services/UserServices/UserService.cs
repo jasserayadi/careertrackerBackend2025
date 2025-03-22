@@ -1,6 +1,8 @@
 ﻿using Career_Tracker_Backend.Models;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using System.Threading.Tasks;
+using static Career_Tracker_Backend.Services.UserServices.MoodleService;
 
 namespace Career_Tracker_Backend.Services.UserServices
 {
@@ -8,11 +10,12 @@ namespace Career_Tracker_Backend.Services.UserServices
     {
         private readonly ApplicationDbContext _context;
         private readonly IMoodleService _moodleService;
-
-        public UserService(ApplicationDbContext context, IMoodleService moodleService)
+        private readonly ILogger<UserService> _logger;
+        public UserService(ApplicationDbContext context, IMoodleService moodleService, ILogger<UserService> logger)
         {
             _context = context;
             _moodleService = moodleService;
+            _logger = logger;
         }
 
         public async Task<bool> RegisterUser(string username, string firstname, string lastname, string password, string email, IFormFile cvFile, RoleName role)
@@ -146,7 +149,29 @@ namespace Career_Tracker_Backend.Services.UserServices
 
 
 
+        public async Task<User> GetUserByIdAsync(int userId)
+        {
+            var user = await _context.Users
+         
+                .Include(u => u.Role)
+                .Include(u => u.CV)
+           
+          
+             
+               
+                .FirstOrDefaultAsync(u => u.UserId == userId);
 
+            if (user == null)
+            {
+                throw new KeyNotFoundException("User not found.");
+            }
+
+            return user;
+        }
+        public async Task<MoodleCompletionStatus> GetUserCourseCompletionStatusAsync(int userId, int courseId)
+        {
+            return await _moodleService.GetCourseCompletionStatusAsync(userId, courseId);
+        }
 
     }
 
