@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using static Career_Tracker_Backend.Services.UserServices.MoodleService;
 
 namespace Career_Tracker_Backend.Controllers
 {
@@ -138,6 +139,28 @@ namespace Career_Tracker_Backend.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = ex.Message });
+            }
+        }
+        [HttpGet("grades/{courseId}/{userId}")]
+        public async Task<ActionResult<List<MoodleGradeItem>>> GetUserGrades(int courseId, int userId)
+        {
+            try
+            {
+               
+
+                var grades = await _moodleService.GetUserGradesAsync(courseId, userId);
+
+                if (grades == null || grades.Count == 0)
+                {
+                    return NotFound("No grades found for this user in the specified course");
+                }
+
+                return Ok(grades);
+            }
+            catch (Exception ex)
+            {
+               
+                return StatusCode(500, ex.Message);
             }
         }
     }

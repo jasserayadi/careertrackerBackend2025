@@ -902,5 +902,82 @@ namespace Career_Tracker_Backend.Services.UserServices
         {
             public string Message { get; set; }
         }
+        public async Task<List<MoodleGradeItem>> GetUserGradesAsync(int courseId, int localUserId)
+        {
+            // 1. Get Moodle User ID from local database
+            var moodleUserId = await GetMoodleUserIdAsync(localUserId);
+            if (!moodleUserId.HasValue)
+            {
+                throw new Exception($"No Moodle user ID found for local user {localUserId}");
+            }
+
+            // 2. Prepare Moodle API request
+            var moodleUrl = "http://localhost/Mymoodle/webservice/rest/server.php";
+            var moodleToken = "aba8b4d828c431ef68123b83f5a9cba8";
+
+            var formData = new List<KeyValuePair<string, string>>
+    {
+        new("wstoken", moodleToken),
+        new("wsfunction", "gradereport_user_get_grade_items"),
+        new("moodlewsrestformat", "json"),
+        new("courseid", courseId.ToString()),
+        new("userid", moodleUserId.Value.ToString())
+    };
+
+            // 3. Execute the request
+            var content = new FormUrlEncodedContent(formData);
+            var response = await _httpClient.PostAsync(moodleUrl, content);
+
+            // 4. Handle response
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception($"Moodle API error: {responseContent}");
+            }
+
+            try
+            {
+                var result = JsonConvert.DeserializeObject<MoodleGradeReport>(responseContent);
+                return result?.UserGrades?.FirstOrDefault()?.GradeItems ?? new List<MoodleGradeItem>();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to parse Moodle response: {ex.Message}");
+            }
+        }
+
+        // Your existing method (keep this)
+   
+        public class MoodleGradeReport
+        {
+            [JsonProperty("usergrades")]
+            public List<MoodleUserGrade> UserGrades { get; set; }
+        }
+
+        public class MoodleUserGrade
+        {
+            [JsonProperty("gradeitems")]
+            public List<MoodleGradeItem> GradeItems { get; set; }
+        }
+
+        public class MoodleGradeItem
+        {
+            [JsonProperty("id")]
+            public int Id { get; set; }
+
+            [JsonProperty("itemname")]
+            public string ItemName { get; set; }
+
+            [JsonProperty("graderaw")]
+            public decimal? GradeRaw { get; set; }
+
+            [JsonProperty("gradedatesubmitted")]
+            public int? DateSubmitted { get; set; }
+
+            [JsonProperty("percentageformatted")]
+            public string percentageformatted { get; set; }
+
+        }
     }
 }
