@@ -948,7 +948,7 @@ namespace Career_Tracker_Backend.Services.UserServices
         }
 
         // Your existing method (keep this)
-   
+
         public class MoodleGradeReport
         {
             [JsonProperty("usergrades")]

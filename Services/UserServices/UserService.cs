@@ -152,13 +152,13 @@ namespace Career_Tracker_Backend.Services.UserServices
         public async Task<User> GetUserByIdAsync(int userId)
         {
             var user = await _context.Users
-         
+
                 .Include(u => u.Role)
                 .Include(u => u.CV)
-           
-          
-             
-               
+
+
+
+
                 .FirstOrDefaultAsync(u => u.UserId == userId);
 
             if (user == null)

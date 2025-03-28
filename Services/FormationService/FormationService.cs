@@ -17,14 +17,34 @@ public class FormationService : IFormationService
 
     public async Task SyncFormationsAsync()
     {
-        // Fetch courses from Moodle
+        // Fetch current courses from Moodle
         var moodleCourses = await _moodleService.GetCoursesAsync();
+        var moodleCourseIds = moodleCourses.Select(c => c.Id).ToList();
 
+        // Get all formations from database
+        var dbFormations = await _context.Formations.ToListAsync();
+
+        // Identify formations that exist in DB but not in Moodle (deleted courses)
+        var deletedFormationIds = dbFormations
+            .Where(f => !moodleCourseIds.Contains(f.MoodleCourseId))
+            .Select(f => f.FormationId)
+            .ToList();
+
+        // Delete formations that no longer exist in Moodle
+        if (deletedFormationIds.Any())
+        {
+            var formationsToDelete = dbFormations
+                .Where(f => deletedFormationIds.Contains(f.FormationId))
+                .ToList();
+
+            _context.Formations.RemoveRange(formationsToDelete);
+        }
+
+        // Add/update existing courses
         foreach (var moodleCourse in moodleCourses)
         {
-            // Check if the course already exists in the database
-            var existingFormation = await _context.Formations
-                .FirstOrDefaultAsync(f => f.MoodleCourseId == moodleCourse.Id);
+            var existingFormation = dbFormations
+                .FirstOrDefault(f => f.MoodleCourseId == moodleCourse.Id);
 
             if (existingFormation == null)
             {
@@ -39,7 +59,6 @@ public class FormationService : IFormationService
                     CreatedAt = DateTime.UtcNow
                 };
 
-                // Add to database
                 _context.Formations.Add(formation);
             }
             else
@@ -53,7 +72,6 @@ public class FormationService : IFormationService
             }
         }
 
-        // Save changes
         await _context.SaveChangesAsync();
     }
 }

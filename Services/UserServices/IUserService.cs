@@ -13,7 +13,7 @@ namespace Career_Tracker_Backend.Services.UserServices
         Task<List<User>> GetUsersAsync();
         Task<User> GetUserByUsernameAsync(string username);
         Task<bool> DeleteUserAsync(int userId);
-     
+
         Task<MoodleCompletionStatus> GetUserCourseCompletionStatusAsync(int userId, int courseId);
         Task<User> GetUserByIdAsync(int userId);
 

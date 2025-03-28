@@ -146,7 +146,7 @@ namespace Career_Tracker_Backend.Controllers
         {
             try
             {
-               
+
 
                 var grades = await _moodleService.GetUserGradesAsync(courseId, userId);
 
@@ -159,7 +159,7 @@ namespace Career_Tracker_Backend.Controllers
             }
             catch (Exception ex)
             {
-               
+
                 return StatusCode(500, ex.Message);
             }
         }

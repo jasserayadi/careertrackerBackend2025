@@ -35,14 +35,42 @@ namespace Career_Tracker_Backend.Services.CourseService
                 throw new Exception($"Invalid FormationId: The Formation with ID {formationId} does not exist.");
             }
 
+            // Get all existing courses for this Moodle course from our database
+            var existingCourses = await _context.Courses
+                .Where(c => c.MoodleCourseId == moodleCourseId)
+                .ToListAsync();
+
+            // Collect all module identifiers from Moodle
+            var moodleModules = new List<(int Section, string Name)>();
             foreach (var content in courseContents)
             {
-                // Loop through each module in the course content
+                foreach (var module in content.Modules)
+                {
+                    moodleModules.Add((content.Section, module.Name));
+                }
+            }
+
+            // Identify courses that exist in DB but not in Moodle (deleted content)
+            var deletedCourses = existingCourses
+                .Where(ec => !moodleModules.Any(mm =>
+                    mm.Section == ec.MoodleSectionId &&
+                    mm.Name == ec.Name))
+                .ToList();
+
+            // Delete courses that no longer exist in Moodle
+            if (deletedCourses.Any())
+            {
+                _context.Courses.RemoveRange(deletedCourses);
+            }
+
+            // Add/update existing content
+            foreach (var content in courseContents)
+            {
                 foreach (var module in content.Modules)
                 {
                     // Check if the module already exists in the database
-                    var existingCourse = await _context.Courses
-                        .FirstOrDefaultAsync(c =>
+                    var existingCourse = existingCourses
+                        .FirstOrDefault(c =>
                             c.MoodleCourseId == moodleCourseId &&
                             c.MoodleSectionId == content.Section &&
                             c.Name == module.Name);
@@ -52,21 +80,20 @@ namespace Career_Tracker_Backend.Services.CourseService
                         // Create a new Course entity if it doesn't exist
                         var course = new Course
                         {
-                            Name = module.Name, // Module name (e.g., "Announcements")
-                            Summary = content.Summary, // Section summary (if available)
-                            Content = module.Contents?.FirstOrDefault()?.Content, // Module content (if available)
+                            Name = module.Name,
+                            Summary = content.Summary,
+                            Content = module.Contents?.FirstOrDefault()?.Content,
                             MoodleCourseId = moodleCourseId,
                             MoodleSectionId = content.Section,
-                            Url = module.Url, // Module URL (e.g., "http://localhost/Mymoodle/mod/forum/view.php?id=2")
-                            ModName = module.ModName, // Module type (e.g., "forum")
-                            ModIcon = module.ModIcon, // Module icon URL (e.g., "http://localhost/Mymoodle/theme/image.php/boost/forum/1741792922/monologo?filtericon=1")
-                            ModPurpose = module.Purpose, // Module purpose (e.g., "collaboration")
-                            FormationId = formationId, // Use moodleCourseId as FormationId
+                            Url = module.Url,
+                            ModName = module.ModName,
+                            ModIcon = module.ModIcon,
+                            ModPurpose = module.Purpose,
+                            FormationId = formationId,
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
                         };
 
-                        // Add the Course to the database
                         _context.Courses.Add(course);
                     }
                     else
