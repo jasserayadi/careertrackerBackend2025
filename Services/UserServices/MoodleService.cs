@@ -979,5 +979,44 @@ namespace Career_Tracker_Backend.Services.UserServices
             public string percentageformatted { get; set; }
 
         }
+        public async Task<string> GetCourseNameAsync(int courseId)
+        {
+            try
+            {
+                var moodleUrl = "http://localhost/Mymoodle/webservice/rest/server.php";
+                var moodleToken = "aba8b4d828c431ef68123b83f5a9cba8";
+
+                using var httpClient = new HttpClient();
+                var content = new FormUrlEncodedContent(new[]
+                {
+            new KeyValuePair<string, string>("wstoken", moodleToken),
+            new KeyValuePair<string, string>("wsfunction", "core_course_get_courses_by_field"),
+            new KeyValuePair<string, string>("moodlewsrestformat", "json"),
+            new KeyValuePair<string, string>("field", "id"),
+            new KeyValuePair<string, string>("value", courseId.ToString())
+        });
+
+                var response = await httpClient.PostAsync(moodleUrl, content);
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var result = JsonConvert.DeserializeObject<MoodleCourseResponse>(responseContent);
+                    return result?.Courses?.FirstOrDefault()?.Fullname ?? $"Course {courseId}";
+                }
+            }
+            catch
+            {
+                // Fallback if Moodle request fails
+            }
+            return $"Course {courseId}";
+        }
+
+        // Add these classes for Moodle response deserialization
+        public class MoodleCourseResponse
+        {
+            public List<MoodleCourse> Courses { get; set; }
+        }
+
+        
     }
 }

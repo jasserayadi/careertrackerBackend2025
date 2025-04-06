@@ -35,9 +35,11 @@ namespace Career_Tracker_Backend.Controllers
                 request.Firstname,
                 request.Lastname,
                 request.Password,
+                 request.confirmPassword,
                 request.Email,
-                request.CvFile,
-                request.Role
+                request.CvFile
+               
+             
             );
 
             if (!result)
@@ -57,6 +59,7 @@ namespace Career_Tracker_Backend.Controllers
             public string Email { get; set; }
             public IFormFile CvFile { get; set; }
             public RoleName Role { get; set; }
+            public string confirmPassword { get; set; }
         }
 
         [HttpGet]

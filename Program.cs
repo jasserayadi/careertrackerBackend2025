@@ -13,6 +13,7 @@ using Career_Tracker_Backend.Services.CourseService;
 using Career_Tracker_Backend.Controllers;
 using Career_Tracker_Backend.Services.QuizService;
 using Career_Tracker_Backend.Services.InscriptionService;
+using Career_Tracker_Backend.Services.CertificateService;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -69,6 +70,7 @@ builder.Services.AddScoped<IFormationService, FormationService>();
 builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IQuizService, QuizService>();
 builder.Services.AddScoped<IInscriptionService, InscriptionService>();
+builder.Services.AddScoped<ICertificateService, CertificateService>();
 // Add Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

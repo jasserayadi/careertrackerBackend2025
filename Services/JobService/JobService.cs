@@ -42,14 +42,49 @@ namespace Career_Tracker_Backend.Services.JobService
             return jobs;
         }
 
-        /*public async Task<List<User>> GetUsersAsync()
-{
-   var users = await _context.Users
-       .Include(u => u.CV)
-       .Include(u => u.Role)
-       .ToListAsync();
-   return users;
-}*/
+        // In JobService.cs
+        public async Task<bool> DeleteJobAsync(int jobId)
+        {
+            var job = await _context.Jobs.FindAsync(jobId);
+            if (job == null)
+            {
+                return false;
+            }
+
+            _context.Jobs.Remove(job);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+        private bool JobExists(int jobId)
+        {
+            return _context.Jobs.Any(e => e.JobId == jobId);
+        }
+        public async Task<Job?> UpdateJobAsync(int jobId, Job jobUpdate)
+        {
+            var existingJob = await _context.Jobs.FindAsync(jobId);
+            if (existingJob == null)
+            {
+                return null;
+            }
+
+            // Only update the fields we want to allow changing
+            existingJob.JobName = jobUpdate.JobName;
+            existingJob.JobDescription = jobUpdate.JobDescription;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                return existingJob;
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!JobExists(jobId))
+                {
+                    return null;
+                }
+                throw;
+            }
+        }
 
     }
 }

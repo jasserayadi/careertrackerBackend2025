@@ -1,6 +1,7 @@
 ﻿using Career_Tracker_Backend.Models;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using static Career_Tracker_Backend.Services.UserServices.MoodleService;
 
@@ -18,77 +19,125 @@ namespace Career_Tracker_Backend.Services.UserServices
             _logger = logger;
         }
 
-        public async Task<bool> RegisterUser(string username, string firstname, string lastname, string password, string email, IFormFile cvFile, RoleName role)
+        public async Task<bool> RegisterUser(string username, string firstname, string lastname,
+                                    string password, string confirmPassword, string email,
+                                    IFormFile cvFile)
         {
-            // Vérifier les champs obligatoires
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password) || string.IsNullOrEmpty(email))
-                return false;
+            // Check required fields
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password) ||
+                string.IsNullOrEmpty(email) || string.IsNullOrEmpty(confirmPassword))
+            {
+                throw new Exception("All required fields must be filled.");
+            }
 
-            // Créer un nouvel utilisateur
+            // Check if passwords match
+            if (password != confirmPassword)
+            {
+                throw new Exception("Password and confirmation password do not match.");
+            }
+
+            // Check if email already exists
+            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (existingUser != null)
+            {
+                throw new Exception("Email already exists.");
+            }
+
+            // Validate password complexity
+            if (!IsPasswordValid(password))
+            {
+                throw new Exception("Password must have at least 8 characters, including 1 digit, " +
+                                  "1 lowercase, 1 uppercase, and 1 special character.");
+            }
+
+            // Create new user with hardcoded NewEmploye role
             var user = new User
             {
                 Username = username,
                 Firstname = firstname,
                 Lastname = lastname,
-                Password = password, // Hash the password in a real application
+                Password = HashPassword(password), // Always hash passwords before storing
                 Email = email,
                 DateCreation = DateTimeOffset.UtcNow,
-                Role = new Role { RoleName = role } // Assign the role
+                Role = new Role { RoleName = RoleName.NewEmploye } // Hardcoded role
             };
 
             // Handle CV upload
             if (cvFile != null && cvFile.Length > 0)
             {
-                // Save the CV file to a directory or cloud storage
                 var cvFilePath = await SaveCvFileAsync(cvFile);
-
-                // Create a new CV entity
                 var cv = new CV
                 {
                     CvFile = cvFilePath,
                     User = user
                 };
-
-                // Add the CV to the user
                 user.CV = cv;
             }
+            else
+            {
+                throw new Exception("CV file is required.");
+            }
 
-            // Ajouter l'utilisateur à la base de données
+            // Add user to database
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Créer l'utilisateur dans Moodle
-            var moodleUserCreated = await _moodleService.CreateMoodleUserAsync(username, firstname, lastname, password, email);
-            if (!moodleUserCreated)
+            // Create user in Moodle
+            try
             {
-                // Gérer l'échec de la création dans Moodle
-                throw new Exception("User created locally but failed to create in Moodle.");
+                var moodleUserCreated = await _moodleService.CreateMoodleUserAsync(username, firstname, lastname, password, email);
+                if (!moodleUserCreated)
+                {
+                    // Optional: You might want to delete the locally created user if Moodle creation fails
+                    throw new Exception("User created locally but failed to create in Moodle.");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Moodle user creation failed: {ex.Message}");
             }
 
             return true;
         }
 
+        private bool IsPasswordValid(string password)
+        {
+            // Password must have:
+            // - at least 8 characters
+            // - at least 1 digit
+            // - at least 1 lowercase letter
+            // - at least 1 uppercase letter
+            // - at least 1 special character (*, -, #, etc.)
+            var regex = new Regex(@"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$");
+            return regex.IsMatch(password);
+        }
+
+        private string HashPassword(string password)
+        {
+            // Example using BCrypt (you'll need to install the BCrypt.Net-Next package)
+            return BCrypt.Net.BCrypt.HashPassword(password);
+        }
+
         private async Task<string> SaveCvFileAsync(IFormFile cvFile)
         {
-            // Define the directory to save the CV file
+            // Ensure the uploads directory exists
             var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
             if (!Directory.Exists(uploadsFolder))
             {
                 Directory.CreateDirectory(uploadsFolder);
             }
 
-            // Generate a unique file name
+            // Generate unique file name
             var uniqueFileName = Guid.NewGuid().ToString() + "_" + cvFile.FileName;
             var filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
-            // Save the file to the server
+            // Save the file
             using (var fileStream = new FileStream(filePath, FileMode.Create))
             {
                 await cvFile.CopyToAsync(fileStream);
             }
 
-            // Return only the filename (or relative path)
-            return uniqueFileName;
+            return $"/uploads/{uniqueFileName}"; // Return the relative path
         }
 
         public async Task<List<User>> GetUsersAsync()
