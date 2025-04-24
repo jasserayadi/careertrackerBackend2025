@@ -17,12 +17,14 @@ namespace Career_Tracker_Backend.Services.UserServices
         private readonly HttpClient _httpClient;
         private readonly ApplicationDbContext _context;
         private readonly ILogger<MoodleService> _logger;
+        private readonly IConfiguration _configuration;
 
-        public MoodleService(HttpClient httpClient, ApplicationDbContext context, ILogger<MoodleService> logger)
+        public MoodleService(HttpClient httpClient, ApplicationDbContext context, ILogger<MoodleService> logger, IConfiguration configuration)
         {
             _httpClient = httpClient;
             _context = context;
             _logger = logger;
+            _configuration = configuration;
         }
 
         public async Task<bool> CreateMoodleUserAsync(string username, string firstname, string lastname, string password, string email)
@@ -1016,7 +1018,82 @@ namespace Career_Tracker_Backend.Services.UserServices
         {
             public List<MoodleCourse> Courses { get; set; }
         }
+        public async Task<string> GetMoodleTokenAsync(string username, string password)
+        {
+            try
+            {
+                var moodleUrl = _configuration["Moodle:BaseUrl"];
+                var requestUrl = $"{moodleUrl}/login/token.php?" +
+                               $"username={Uri.EscapeDataString(username)}&" +
+                               $"password={Uri.EscapeDataString(password)}&" +
+                               "service=moodle_mobile_app";
 
-        
-    }
+                var response = await _httpClient.GetAsync(requestUrl);
+
+                // First check if we got HTML back (indicates error)
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (responseContent.StartsWith("<!DOCTYPE html>") ||
+                    responseContent.StartsWith("<"))
+                {
+                    _logger.LogError("Moodle returned HTML instead of JSON. URL might be wrong.");
+                    return null;
+                }
+
+                // Try parsing as JSON
+                using var jsonDoc = JsonDocument.Parse(responseContent);
+
+                if (jsonDoc.RootElement.TryGetProperty("token", out var tokenElement))
+                {
+                    return tokenElement.GetString();
+                }
+
+                if (jsonDoc.RootElement.TryGetProperty("error", out var errorElement))
+                {
+                    _logger.LogError("Moodle error: {Error}", errorElement.GetString());
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get Moodle token");
+                return null;
+            }
+        }
+
+
+        private async Task<string?> GetMoodleUserId(string username)
+        {
+            try
+            {
+                var _moodleUrl = "http://localhost/Mymoodle/webservice/rest/server.php";
+                var _moodleWSToken = "aba8b4d828c431ef68123b83f5a9cba8";
+                var requestUrl = $"{_moodleUrl}/webservice/rest/server.php" +
+                    $"?wstoken={_moodleWSToken}" +
+                    $"&wsfunction=core_user_get_users_by_field" +
+                    $"&field=username" +
+                    $"&values[0]={Uri.EscapeDataString(username)}" +
+                    "&moodlewsrestformat=json";
+
+                var response = await _httpClient.GetAsync(requestUrl);
+                response.EnsureSuccessStatusCode();
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                using var jsonDoc = JsonDocument.Parse(responseContent);
+
+                if (jsonDoc.RootElement.EnumerateArray().Any())
+                {
+                    return jsonDoc.RootElement[0].GetProperty("id").GetInt32().ToString();
+                }
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+    
+
+}
 }

@@ -137,7 +137,7 @@ namespace Career_Tracker_Backend.Services.UserServices
                 await cvFile.CopyToAsync(fileStream);
             }
 
-            return $"/uploads/{uniqueFileName}"; // Return the relative path
+            return $"/{uniqueFileName}"; // Return the relative path
         }
 
         public async Task<List<User>> GetUsersAsync()
@@ -161,26 +161,73 @@ namespace Career_Tracker_Backend.Services.UserServices
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // Find user
-                var user = await _context.Users.Include(u => u.CV).FirstOrDefaultAsync(u => u.UserId == userId);
+                // Find the user with related entities
+                var user = await _context.Users
+                    .Include(u => u.CV)
+                    .Include(u => u.Inscriptions)
+                    .Include(u => u.Feedbacks)
+                    .Include(u => u.Certificats)
+                    
+                    .FirstOrDefaultAsync(u => u.UserId == userId);
+
                 if (user == null)
                     throw new Exception("User not found in the local database.");
 
-                // Delete user in Moodle
-                var moodleUserDeleted = await _moodleService.DeleteMoodleUserAsync(new List<int> { userId });
+                // Ensure MoodleUserId exists before trying to delete it on Moodle
+                if (!user.MoodleUserId.HasValue)
+                    throw new Exception("User has no associated Moodle account");
+
+                // Call Moodle deletion using MoodleUserId
+                var moodleUserDeleted = await _moodleService.DeleteMoodleUserAsync(
+                    new List<int> { user.MoodleUserId.Value });
+
                 if (!moodleUserDeleted)
                     throw new Exception("Failed to delete user in Moodle.");
 
-                // Delete user's CV file if exists
-                if (user.CV != null && !string.IsNullOrEmpty(user.CV.CvFile))
+                // Clean up related Inscriptions
+                if (user.Inscriptions != null && user.Inscriptions.Any())
                 {
-                    var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", user.CV.CvFile);
-                    if (File.Exists(filePath))
-                        File.Delete(filePath);
+                    _context.Inscriptions.RemoveRange(user.Inscriptions);
                 }
 
-                // Remove user from database
+                // Clean up related Feedbacks
+                if (user.Feedbacks != null && user.Feedbacks.Any())
+                {
+                    _context.Feedbacks.RemoveRange(user.Feedbacks);
+                }
+
+                // Clean up related Certificates
+                if (user.Certificats != null && user.Certificats.Any())
+                {
+                    _context.Certificats.RemoveRange(user.Certificats);
+                }
+
+                // Remove from Formations if needed (depends on relationship setup)
+                if (user.Formations != null && user.Formations.Any())
+                {
+                    foreach (var formation in user.Formations.ToList())
+                    {
+                        user.Formations.Remove(formation);
+                    }
+                }
+
+                // Remove CV and file if exists
+                if (user.CV != null)
+                {
+                    if (!string.IsNullOrEmpty(user.CV.CvFile))
+                    {
+                        var filePath = Path.Combine(Directory.GetCurrentDirectory(),
+                            "wwwroot", "uploads", user.CV.CvFile);
+                        if (File.Exists(filePath))
+                            File.Delete(filePath);
+                    }
+                    _context.CVs.Remove(user.CV);
+                }
+
+                // Remove the user itself
                 _context.Users.Remove(user);
+
+                // Save and commit
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
@@ -189,10 +236,11 @@ namespace Career_Tracker_Backend.Services.UserServices
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                Console.WriteLine($"Error: {ex.Message}");
+                _logger.LogError(ex, $"Error deleting user {userId}: {ex.Message}");
                 return false;
             }
         }
+
 
 
 

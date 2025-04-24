@@ -4,16 +4,19 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Career_Tracker_Backend;
 using Career_Tracker_Backend.Services.UserServices;
-using Career_Tracker_Backend.Services;
+
 using Career_Tracker_Backend.Services.JobService;
 using Microsoft.Extensions.FileProviders;
 using System.Text.Json.Serialization;
 using Career_Tracker_Backend.Services.FormationService;
 using Career_Tracker_Backend.Services.CourseService;
-using Career_Tracker_Backend.Controllers;
+
 using Career_Tracker_Backend.Services.QuizService;
 using Career_Tracker_Backend.Services.InscriptionService;
 using Career_Tracker_Backend.Services.CertificateService;
+using Career_Tracker_Backend.Services;
+
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,7 +28,16 @@ builder.Services.AddCors(options =>
                         .AllowAnyMethod()
                         .AllowAnyHeader());
 });
-
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("SecureFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
 // Configure database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -71,6 +83,25 @@ builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IQuizService, QuizService>();
 builder.Services.AddScoped<IInscriptionService, InscriptionService>();
 builder.Services.AddScoped<ICertificateService, CertificateService>();
+//builder.Services.AddScoped<ICvService, CvService>();
+// In Program.cs, update your HttpClient configuration
+builder.Services.AddHttpClient<ICvService, CvService>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["CvProcessing:BaseUrl"] ?? "http://localhost:8000");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+//builder.Services.AddScoped< RecommendationService>();
+// In Program.cs
+
+builder.Services.AddHttpClient<RecommendationService>(client =>
+{
+    // Either use configuration (make sure it exists in appsettings.json)
+   
+    // Or hardcode as fallback (remove the above line if using this)
+     client.BaseAddress = new Uri("http://localhost:8000");
+
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 // Add Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -85,6 +116,7 @@ builder.Services.AddControllers()
         // Ignore null values
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
     });
+
 var app = builder.Build();
 
 // Enable Swagger in development
@@ -96,6 +128,7 @@ if (app.Environment.IsDevelopment())
 
 // Apply CORS before authentication
 app.UseCors("AllowAllOrigins");
+app.UseCors("SecureFrontend");
 
 // Global error handling
 app.UseExceptionHandler("/error");

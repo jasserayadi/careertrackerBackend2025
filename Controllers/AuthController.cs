@@ -1,123 +1,148 @@
-﻿using Career_Tracker_Backend.Services.UserServices;
+﻿using Career_Tracker_Backend.Models;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace Career_Tracker_Backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [EnableCors("SecureFrontend")]
     public class AuthController : ControllerBase
     {
-        private readonly AuthService _authService;
         private readonly ApplicationDbContext _context;
-        private readonly ILogger<AuthController> _logger;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(
-            AuthService authService,
-            ApplicationDbContext context,
-            ILogger<AuthController> logger)
+        public AuthController(ApplicationDbContext context, IConfiguration configuration)
         {
-            _authService = authService;
             _context = context;
-            _logger = logger;
+            _configuration = configuration;
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        public IActionResult Login([FromBody] LoginRequest request)
         {
-            if (!ModelState.IsValid)
+            var user = _context.Users.FirstOrDefault(u => u.Username == request.Username);
+
+            if (user == null || !user.VerifyPassword(request.Password))
+                return Unauthorized(new { message = "Invalid username or password" });
+
+            var token = GenerateJwtToken(user);
+
+            // Set secure HTTP-only cookies
+            Response.Cookies.Append(
+                "userId",
+                user.UserId.ToString(),
+                new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true, // Enable in production
+                    SameSite = SameSiteMode.Strict,
+                    Expires = DateTime.UtcNow.AddDays(7)
+                });
+
+            Response.Cookies.Append(
+                "token",
+                token,
+                new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true, // Enable in production
+                    SameSite = SameSiteMode.Strict,
+                    Expires = DateTime.UtcNow.AddDays(7)
+                });
+
+            return Ok(new
             {
-                return BadRequest(ModelState);
+                Message = "Login successful",
+                Username = user.Username,
+                UserId = user.UserId
+            });
+        }
+
+        [HttpGet("session")]
+        public IActionResult GetSession()
+        {
+            if (!Request.Cookies.TryGetValue("userId", out var userId) ||
+                !Request.Cookies.TryGetValue("token", out var token))
+            {
+                return Unauthorized();
             }
+
+            // Validate token
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]);
 
             try
             {
-                // 1. Local authentication
-                var user = _authService.Authenticate(request.Username, request.Password);
-                if (user == null)
+                tokenHandler.ValidateToken(token, new TokenValidationParameters
                 {
-                    return Unauthorized(new { Message = "Invalid username or password" });
-                }
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidIssuer = _configuration["Jwt:Issuer"],
+                    ValidAudience = _configuration["Jwt:Audience"],
+                    ValidateLifetime = true
+                }, out _);
 
-                // 2. Moodle integration
-                var moodleResult = await _authService.AuthenticateWithMoodle(request.Username, request.Password);
+                var user = _context.Users.FirstOrDefault(u => u.UserId.ToString() == userId);
+                if (user == null) return Unauthorized();
 
-                // 3. Update Moodle user ID if verification succeeded
-                if (moodleResult.Success && moodleResult.MoodleUser != null)
+                return Ok(new
                 {
-                    user.MoodleUserId = moodleResult.MoodleUser.Id;
-                    await _context.SaveChangesAsync();
-                }
-
-                // 4. Generate JWT token
-                var token = _authService.GenerateJwtToken(user);
-
-                // 5. Prepare response
-                var response = new LoginResponse
-                {
-                    Token = token,
-                    User = new UserDto
-                    {
-                        Id = user.UserId,
-                        Username = user.Username,
-                        Email = user.Email,
-                        Firstname = user.Firstname,
-                        Lastname = user.Lastname,
-                        MoodleUserId = user.MoodleUserId
-                    },
-                    Moodle = new MoodleAuthResponseDto
-                    {
-                        Success = moodleResult.Success,
-                        LoginUrl = moodleResult.RedirectUrl,
-                        DashboardUrl = moodleResult.DashboardUrl,
-                        MoodleUserId = moodleResult.MoodleUser?.Id
-                    }
-                };
-
-                return Ok(response);
+                    username = user.Username,
+                    userId = user.UserId,
+                    firstname = user.Firstname,
+                    lastname = user.Lastname,
+                    email = user.Email
+                });
             }
-            catch (Exception ex)
+            catch
             {
-                _logger.LogError(ex, "Login failed for {Username}", request.Username);
-                return StatusCode(500, new { Message = "An error occurred during login" });
+                return Unauthorized();
             }
+        }
+
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            Response.Cookies.Delete("userId");
+            Response.Cookies.Delete("token");
+            return Ok(new { message = "Logged out successfully" });
+        }
+
+        private string GenerateJwtToken(User user)
+        {
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+            var claims = new[]
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.Username),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+                new Claim("userId", user.UserId.ToString())
+            };
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(30),
+                signingCredentials: credentials
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 
     public class LoginRequest
     {
-        [Required(ErrorMessage = "Username is required")]
-        [StringLength(50, MinimumLength = 3, ErrorMessage = "Username must be between 3 and 50 characters")]
         public string Username { get; set; }
-
-        [Required(ErrorMessage = "Password is required")]
-        [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters")]
         public string Password { get; set; }
-    }
-
-    public class LoginResponse
-    {
-        public string Token { get; set; }
-        public UserDto User { get; set; }
-        public MoodleAuthResponseDto Moodle { get; set; }
-    }
-
-    public class UserDto
-    {
-        public int Id { get; set; }
-        public string Username { get; set; }
-        public string Email { get; set; }
-        public string Firstname { get; set; }
-        public string Lastname { get; set; }
-        public int? MoodleUserId { get; set; }
-    }
-
-    public class MoodleAuthResponseDto
-    {
-        public bool Success { get; set; }
-        public int? MoodleUserId { get; set; }
-        public string LoginUrl { get; set; }
-        public string DashboardUrl { get; set; }
     }
 }

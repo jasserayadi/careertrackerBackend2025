@@ -29,6 +29,7 @@ namespace Career_Tracker_Backend.Services.JobService
                     JobId = j.JobId,
                     JobName = j.JobName,
                     JobDescription = j.JobDescription,
+                    RequiredSkillsJson=j.RequiredSkillsJson,
                     Users = j.Users.Select(u => new UserDto
                     {
                         UserId = u.UserId,
@@ -70,6 +71,8 @@ namespace Career_Tracker_Backend.Services.JobService
             // Only update the fields we want to allow changing
             existingJob.JobName = jobUpdate.JobName;
             existingJob.JobDescription = jobUpdate.JobDescription;
+            existingJob.RequiredSkillsJson = jobUpdate.RequiredSkillsJson;
+
 
             try
             {

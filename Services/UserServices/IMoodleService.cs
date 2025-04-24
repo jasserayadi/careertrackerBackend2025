@@ -19,6 +19,6 @@ namespace Career_Tracker_Backend.Services.UserServices
         Task<List<MoodleGradeItem>> GetUserGradesAsync(int courseId, int localUserId);
         Task<int?> GetMoodleUserIdAsync(int userId);
         Task<string> GetCourseNameAsync(int courseId);
-
+        Task<string> GetMoodleTokenAsync(string username, string password);
     }
 }
