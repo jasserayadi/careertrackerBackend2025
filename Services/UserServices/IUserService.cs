@@ -19,7 +19,9 @@ namespace Career_Tracker_Backend.Services.UserServices
 
         Task<MoodleCompletionStatus> GetUserCourseCompletionStatusAsync(int userId, int courseId);
         Task<User> GetUserByIdAsync(int userId);
-
+       Task<bool> UpdateUserAsync(int userId, string username, string firstname,
+   string lastname, string email, string password = null, string confirmPassword = null,
+   IFormFile cvFile = null);
 
     }
 }

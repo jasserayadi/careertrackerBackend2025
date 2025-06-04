@@ -46,12 +46,23 @@ namespace Career_Tracker_Backend.Services
                     return cv;
                 }
 
+                // Determine content type based on file extension
+                var fileExtension = Path.GetExtension(filePath).ToLower();
+                var contentType = fileExtension switch
+                {
+                    ".pdf" => "application/pdf",
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    ".png" => "image/png",
+                    ".tiff" => "image/tiff",
+                    _ => throw new InvalidOperationException($"Unsupported file type: {fileExtension}")
+                };
+
                 // Process with ML service
                 await using var fileStream = File.OpenRead(filePath);
                 using var content = new MultipartFormDataContent();
                 using var fileContent = new StreamContent(fileStream);
 
-                fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
                 content.Add(fileContent, "file", Path.GetFileName(filePath));
 
                 var response = await _httpClient.PostAsync("http://localhost:8000/extract-from-cv", content);

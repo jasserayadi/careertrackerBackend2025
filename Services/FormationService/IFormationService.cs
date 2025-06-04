@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Career_Tracker_Backend.Models;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Career_Tracker_Backend.Services.FormationService
 {
@@ -6,5 +7,6 @@ namespace Career_Tracker_Backend.Services.FormationService
     {
    
          Task SyncFormationsAsync();
+      //  Task<int> CreateFullFormationAsync(Formation formation);
     }
 }

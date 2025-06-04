@@ -269,7 +269,131 @@ namespace Career_Tracker_Backend.Services.UserServices
         {
             return await _moodleService.GetCourseCompletionStatusAsync(userId, courseId);
         }
+        // In UserService.cs
+        public async Task<bool> UpdateUserAsync(int userId, string username, string firstname,
+    string lastname, string email, string password = null, string confirmPassword = null,
+    IFormFile cvFile = null)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
 
+            try
+            {
+                var user = await _context.Users
+                    .Include(u => u.CV)
+                    .FirstOrDefaultAsync(u => u.UserId == userId);
+
+                if (user == null)
+                {
+                    throw new Exception("User not found.");
+                }
+
+                // Check if email is being changed and if new email already exists
+                if (user.Email != email)
+                {
+                    var existingUserWithEmail = await _context.Users
+                        .FirstOrDefaultAsync(u => u.Email == email && u.UserId != userId);
+
+                    if (existingUserWithEmail != null)
+                    {
+                        throw new Exception("Email already exists.");
+                    }
+                }
+
+                // Validate password if being changed
+                if (!string.IsNullOrEmpty(password))
+                {
+                    if (password != confirmPassword)
+                    {
+                        throw new Exception("Password and confirmation password do not match.");
+                    }
+
+                    if (!IsPasswordValid(password))
+                    {
+                        throw new Exception("Password must have at least 8 characters, including 1 digit, " +
+                                          "1 lowercase, 1 uppercase, and 1 special character.");
+                    }
+                }
+
+                // Update user properties
+                user.Username = username;
+                user.Firstname = firstname;
+                user.Lastname = lastname;
+                user.Email = email;
+
+                // Update password if provided
+                if (!string.IsNullOrEmpty(password))
+                {
+                    user.Password = HashPassword(password);
+                }
+
+                // Handle CV update
+                if (cvFile != null && cvFile.Length > 0)
+                {
+                    // Validate CV file
+                    if (cvFile.Length > 5 * 1024 * 1024) // 5MB max
+                    {
+                        throw new Exception("CV file size must be less than 5MB.");
+                    }
+
+                    var allowedExtensions = new[] { ".pdf", ".doc", ".docx,",".jpg", ".jpeg",".png",".gif" };
+                    var fileExtension = Path.GetExtension(cvFile.FileName).ToLower();
+                    if (!allowedExtensions.Contains(fileExtension))
+                    {
+                        throw new Exception("Unsupported file type. Allowed types: PDF, DOC, DOCX, JPG, JPEG, PNG, GIF");
+                    }
+
+                    // Delete old CV file if exists
+                    if (user.CV != null && !string.IsNullOrEmpty(user.CV.CvFile))
+                    {
+                        var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(),
+                            "wwwroot", "uploads", user.CV.CvFile);
+                        if (File.Exists(oldFilePath))
+                        {
+                            File.Delete(oldFilePath);
+                        }
+                    }
+
+                    // Save new CV
+                    var cvFilePath = await SaveCvFileAsync(cvFile);
+                    if (user.CV == null)
+                    {
+                        user.CV = new CV { CvFile = cvFilePath };
+                    }
+                    else
+                    {
+                        user.CV.CvFile = cvFilePath;
+                    }
+                }
+
+                // Update Moodle user if MoodleUserId exists
+                if (user.MoodleUserId.HasValue)
+                {
+                    var moodleUpdated = await _moodleService.UpdateMoodleUserAsync(
+                        user.MoodleUserId.Value,
+                        username,
+                        firstname,
+                        lastname,
+                        email,
+                        password);
+
+                    if (!moodleUpdated)
+                    {
+                        throw new Exception("User updated locally but failed to update in Moodle.");
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, $"Error updating user {userId}: {ex.Message}");
+                throw;
+            }
+        }
     }
 
 }

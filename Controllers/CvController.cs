@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Hosting;
 using System.Text.Json;
 using System.ComponentModel.DataAnnotations;
+using System.Text;
 
 namespace Career_Tracker_Backend.Controllers
 {
@@ -27,11 +28,14 @@ namespace Career_Tracker_Backend.Controllers
         [HttpPost("process")]
         [Consumes("multipart/form-data")]
         public async Task<ActionResult<CV>> ProcessCv(
-            [Required] IFormFile file,
-            [Required] int userId)
+    [Required] IFormFile file,
+    [Required] int userId)
         {
-            if (file.ContentType != "application/pdf")
-                return BadRequest("Only PDF files are supported");
+            // Supported file types
+            var supportedContentTypes = new[] { "application/pdf", "image/jpeg", "image/png", "image/tiff" };
+
+            if (!supportedContentTypes.Contains(file.ContentType))
+                return BadRequest("Only PDF, JPEG, PNG, and TIFF files are supported");
 
             try
             {
@@ -101,5 +105,52 @@ namespace Career_Tracker_Backend.Controllers
             cv.CvFile = $"http://localhost:5054/uploads/{cv.CvFile}";
             return Ok(cv);
         }
+        [HttpPost("user/{userId}/extract")]
+        [Produces("text/plain")]
+        public async Task<ActionResult<string>> ExtractFromUserCvv(int userId)
+        {
+            try
+            {
+                // Find the latest CV for the user
+                var cv = await _context.CVs
+                    .Where(c => c.UserId == userId)
+
+                    .FirstOrDefaultAsync();
+
+                if (cv == null)
+                {
+                    return NotFound("No CV found for this user");
+                }
+
+                // Process the CV
+                var processedCv = await _cvService.ExtractFromStoredCvAsync(cv);
+
+                // Format the response as plain text
+                var responseText = new StringBuilder();
+                responseText.AppendLine($"CV processed successfully for user {userId}");
+                responseText.AppendLine($"CV File: {processedCv.CvFile}");
+                responseText.AppendLine();
+
+                responseText.AppendLine("Skills:");
+                foreach (var skill in processedCv.Skills)
+                {
+                    responseText.AppendLine($"- {skill}");
+                }
+
+                responseText.AppendLine();
+                responseText.AppendLine("Experiences:");
+                foreach (var exp in processedCv.Experiences)
+                {
+                    responseText.AppendLine($"- {exp}");
+                }
+
+                return Ok(responseText.ToString());
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error extracting from CV: {ex.Message}");
+            }
+        }
     }
+
 }

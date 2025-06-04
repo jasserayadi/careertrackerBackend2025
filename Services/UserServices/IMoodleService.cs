@@ -20,5 +20,13 @@ namespace Career_Tracker_Backend.Services.UserServices
         Task<int?> GetMoodleUserIdAsync(int userId);
         Task<string> GetCourseNameAsync(int courseId);
         Task<string> GetMoodleTokenAsync(string username, string password);
+         Task<bool> UpdateMoodleUserAsync(int moodleUserId, string username, string firstname,
+            string lastname, string email, string password = null);
+        Task<int> CreateMoodleCourseAsync(Formation formation);
+      
+        Task<int> CreateMoodleQuizAsync(int moodleCourseId, Test test);
+        Task<string> GetBookContentAsync(int courseId, int? bookId = null);
+
+        Task<List<MoodleBook>> GetMoodleBooksForCourse(int courseId);
     }
 }

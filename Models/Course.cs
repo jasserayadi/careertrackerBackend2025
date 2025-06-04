@@ -21,7 +21,7 @@ namespace Career_Tracker_Backend.Models
 
         public int? MoodleCourseId { get; set; } // Allow NULL
         public int? MoodleSectionId { get; set; } // Allow NULL
-
+        public int? MoodleBookId { get; set; } // Add this
         [MaxLength(200)]
         public string? Url { get; set; } // Allow NULL
 

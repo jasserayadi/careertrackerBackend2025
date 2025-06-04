@@ -15,6 +15,7 @@ using Career_Tracker_Backend.Services.QuizService;
 using Career_Tracker_Backend.Services.InscriptionService;
 using Career_Tracker_Backend.Services.CertificateService;
 using Career_Tracker_Backend.Services;
+using System.Net.Http.Headers;
 
 
 
@@ -83,6 +84,7 @@ builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IQuizService, QuizService>();
 builder.Services.AddScoped<IInscriptionService, InscriptionService>();
 builder.Services.AddScoped<ICertificateService, CertificateService>();
+
 //builder.Services.AddScoped<ICvService, CvService>();
 // In Program.cs, update your HttpClient configuration
 builder.Services.AddHttpClient<ICvService, CvService>(client =>
@@ -93,15 +95,17 @@ builder.Services.AddHttpClient<ICvService, CvService>(client =>
 //builder.Services.AddScoped< RecommendationService>();
 // In Program.cs
 
-builder.Services.AddHttpClient<RecommendationService>(client =>
+// In Program.cs (or Startup.cs for .NET 5)
+// Add this to your service configuration
+// Add this to your service configuration
+builder.Services.AddHttpClient<IRecommendationService, RecommendationService>(client =>
 {
-    // Either use configuration (make sure it exists in appsettings.json)
-   
-    // Or hardcode as fallback (remove the above line if using this)
-     client.BaseAddress = new Uri("http://localhost:8000");
-
+    client.BaseAddress = new Uri("http://localhost:8000"); // No trailing slash
+    client.DefaultRequestHeaders.Accept.Add(
+        new MediaTypeWithQualityHeaderValue("application/json"));
     client.Timeout = TimeSpan.FromSeconds(30);
 });
+builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 // Add Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

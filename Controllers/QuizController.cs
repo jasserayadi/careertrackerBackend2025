@@ -1,4 +1,5 @@
-﻿using Career_Tracker_Backend.Services.QuizService;
+﻿using Career_Tracker_Backend.Models;
+using Career_Tracker_Backend.Services.QuizService;
 using Career_Tracker_Backend.Services.UserServices;
 using Microsoft.AspNetCore.Mvc;
 
@@ -80,5 +81,46 @@ public class QuizController : ControllerBase
     {
         var questions = await _quizService.GetTestQuestionsAsync(testId);
         return Ok(questions);
+    }
+    [HttpGet("by-course/{courseId}")]
+    public async Task<ActionResult<object>> GetTestsByCourseAndMoodleQuizId(int courseId, [FromQuery] int? moodleQuizId = null)
+    {
+        try
+        {
+            var tests = await _quizService.GetTestsByCourseAndMoodleQuizIdAsync(courseId, moodleQuizId);
+
+            if (!tests.Any())
+            {
+                var errorMessage = $"No tests found for CourseId {courseId}";
+                if (moodleQuizId.HasValue)
+                {
+                    errorMessage += $" and MoodleQuizId {moodleQuizId.Value}";
+                }
+                _logger.LogWarning(errorMessage);
+                return NotFound(errorMessage);
+            }
+
+            var simplifiedResponse = tests.Select(test => new
+            {
+                test.TestId,
+                test.Title,
+                Questions = test.Questions.Select(q => new
+                {
+                    q.QuestionId,
+                    q.QuestionType,
+                    Choices = q.Choices,
+                    q.CorrectAnswer,
+                    q.QuestionText
+                }).ToList()
+            }).ToList();
+
+            return Ok(simplifiedResponse);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching tests for CourseId {CourseId} and MoodleQuizId {MoodleQuizId}",
+                courseId, moodleQuizId);
+            return StatusCode(500, "An error occurred while fetching tests.");
+        }
     }
 }

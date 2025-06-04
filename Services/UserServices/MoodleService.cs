@@ -25,6 +25,14 @@ namespace Career_Tracker_Backend.Services.UserServices
             _context = context;
             _logger = logger;
             _configuration = configuration;
+            var moodleUrl = "http://localhost/Mymoodle/webservice/rest/server.php";
+            _logger.LogInformation($"Moodle URL from configuration: {moodleUrl}");
+            if (string.IsNullOrWhiteSpace(moodleUrl) || !Uri.TryCreate(moodleUrl, UriKind.Absolute, out var baseUri))
+            {
+                throw new Exception("Invalid or missing Moodle URL in configuration");
+            }
+            _httpClient.BaseAddress = baseUri;
+
         }
 
         public async Task<bool> CreateMoodleUserAsync(string username, string firstname, string lastname, string password, string email)
@@ -112,12 +120,12 @@ namespace Career_Tracker_Backend.Services.UserServices
             var moodleToken = "aba8b4d828c431ef68123b83f5a9cba8";
 
             var formData = new List<KeyValuePair<string, string>>
-            {
-                new KeyValuePair<string, string>("wstoken", moodleToken),
-                new KeyValuePair<string, string>("wsfunction", "core_course_get_contents"),
-                new KeyValuePair<string, string>("moodlewsrestformat", "json"),
-                new KeyValuePair<string, string>("courseid", courseId.ToString())
-            };
+    {
+        new KeyValuePair<string, string>("wstoken", moodleToken),
+        new KeyValuePair<string, string>("wsfunction", "core_course_get_contents"),
+        new KeyValuePair<string, string>("moodlewsrestformat", "json"),
+        new KeyValuePair<string, string>("courseid", courseId.ToString())
+    };
 
             var content = new FormUrlEncodedContent(formData);
             var response = await _httpClient.PostAsync(moodleUrl, content);
@@ -125,12 +133,27 @@ namespace Career_Tracker_Backend.Services.UserServices
 
             if (response.IsSuccessStatusCode)
             {
-                var courseContents = JsonConvert.DeserializeObject<List<MoodleCourseContent>>(responseContent);
-                return courseContents;
+                try
+                {
+                    var settings = new JsonSerializerSettings
+                    {
+                        NullValueHandling = NullValueHandling.Ignore,
+                        MissingMemberHandling = MissingMemberHandling.Ignore
+                    };
+
+                    var courseContents = JsonConvert.DeserializeObject<List<MoodleCourseContent>>(responseContent, settings);
+                    return courseContents ?? new List<MoodleCourseContent>();
+                }
+                catch (System.Text.Json.JsonException ex)
+                {
+                    // Log the actual response for debugging
+                    Console.WriteLine($"Failed to deserialize Moodle response: {responseContent}");
+                    throw new Exception($"Failed to deserialize Moodle response. See logs for details. Error: {ex.Message}");
+                }
             }
             else
             {
-                throw new Exception($"Failed to retrieve course contents from Moodle. Response: {responseContent}");
+                throw new Exception($"Failed to retrieve course contents from Moodle. Status: {response.StatusCode}. Response: {responseContent}");
             }
         }
 
@@ -662,12 +685,19 @@ namespace Career_Tracker_Backend.Services.UserServices
             public int Indent { get; set; }
             public string Onclick { get; set; }
             public string Afterlink { get; set; }
-            public List<object> Activitybadge { get; set; }
+
+            // Change these to dynamic or JToken to handle both objects and arrays
+            [JsonProperty("activitybadge")]
+            public dynamic ActivityBadge { get; set; }
+
             public string Customdata { get; set; }
             public bool Noviewlink { get; set; }
             public int Completion { get; set; }
             public int Downloadcontent { get; set; }
-            public List<object> Dates { get; set; }
+
+            [JsonProperty("dates")]
+            public dynamic Dates { get; set; }
+
             public int Groupmode { get; set; }
             public List<MoodleContent> Contents { get; set; }
         }
@@ -1093,7 +1123,302 @@ namespace Career_Tracker_Backend.Services.UserServices
                 return null;
             }
         }
-    
+        // In MoodleService.cs
+        public async Task<bool> UpdateMoodleUserAsync(int moodleUserId, string username, string firstname,
+            string lastname, string email, string password = null)
+        {
+            var moodleUrl = "http://localhost/Mymoodle/webservice/rest/server.php";
+            var moodleToken = "aba8b4d828c431ef68123b83f5a9cba8";
 
+            var parameters = new List<KeyValuePair<string, string>>
+    {
+        new("wstoken", moodleToken),
+        new("wsfunction", "core_user_update_users"),
+        new("moodlewsrestformat", "json"),
+        new("users[0][id]", moodleUserId.ToString()),
+        new("users[0][username]", username),
+        new("users[0][firstname]", firstname),
+        new("users[0][lastname]", lastname),
+        new("users[0][email]", email)
+    };
+
+            // Only add password if it's being changed
+            if (!string.IsNullOrEmpty(password))
+            {
+                parameters.Add(new KeyValuePair<string, string>("users[0][password]", password));
+            }
+
+            var content = new FormUrlEncodedContent(parameters);
+            var response = await _httpClient.PostAsync(moodleUrl, content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError($"Moodle update failed: {await response.Content.ReadAsStringAsync()}");
+                return false;
+            }
+
+            return true;
+        }
+        public async Task<int> CreateMoodleCourseAsync(Formation formation)
+        {
+            var moodleUrl = "http://localhost/Mymoodle/webservice/rest/server.php";
+            var moodleToken = "aba8b4d828c431ef68123b83f5a9cba8";
+
+            // Calculate number of sections needed based on courses
+            int numsections = formation.Courses?.Count ?? 1;
+
+            var content = new FormUrlEncodedContent(new[]
+            {
+        new KeyValuePair<string, string>("wstoken", moodleToken),
+        new KeyValuePair<string, string>("wsfunction", "core_course_create_courses"),
+        new KeyValuePair<string, string>("moodlewsrestformat", "json"),
+        new KeyValuePair<string, string>("courses[0][fullname]", formation.Fullname),
+        new KeyValuePair<string, string>("courses[0][shortname]", formation.Shortname),
+        new KeyValuePair<string, string>("courses[0][categoryid]", formation.MoodleCategoryId.ToString()),
+        new KeyValuePair<string, string>("courses[0][summary]", formation.Summary ?? ""),
+        new KeyValuePair<string, string>("courses[0][format]", "topics"),
+        new KeyValuePair<string, string>("courses[0][numsections]", numsections.ToString()),
+        new KeyValuePair<string, string>("courses[0][hiddensections]", "0"),
+        new KeyValuePair<string, string>("courses[0][courseformatoptions][0][name]", "numsections"),
+        new KeyValuePair<string, string>("courses[0][courseformatoptions][0][value]", numsections.ToString()),
+    });
+
+            var response = await _httpClient.PostAsync(moodleUrl, content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonConvert.DeserializeObject<List<MoodleCourseCreationResult>>(responseContent);
+                return result?.FirstOrDefault()?.Id ?? throw new Exception("Failed to get created course ID");
+            }
+            else
+            {
+                throw new Exception($"Failed to create Moodle course. Response: {responseContent}");
+            }
+        }
+        public class MoodleCourseCreationResult
+        {
+            [JsonProperty("id")]
+            public int Id { get; set; }
+
+            [JsonProperty("shortname")]
+            public string Shortname { get; set; }
+        }
+
+        public class MoodleSectionCreationResult
+        {
+            [JsonProperty("id")]
+            public int Id { get; set; }
+
+            [JsonProperty("name")]
+            public string Name { get; set; }
+        }
+        public async Task<int> CreateMoodleQuizAsync(int moodleCourseId, Test test)
+        {
+            var moodleUrl = "http://localhost/Mymoodle/webservice/rest/server.php";
+            var moodleToken = "aba8b4d828c431ef68123b83f5a9cba8";
+
+            var content = new FormUrlEncodedContent(new[]
+            {
+        new KeyValuePair<string, string>("wstoken", moodleToken),
+        new KeyValuePair<string, string>("wsfunction", "mod_quiz_add_quiz"),
+        new KeyValuePair<string, string>("moodlewsrestformat", "json"),
+        new KeyValuePair<string, string>("course", moodleCourseId.ToString()),
+        new KeyValuePair<string, string>("name", test.Title),
+        new KeyValuePair<string, string>("intro", test.Description ?? ""),
+        new KeyValuePair<string, string>("timeopen", "0"),
+        new KeyValuePair<string, string>("timeclose", "0"),
+        new KeyValuePair<string, string>("timelimit", "0"),
+        new KeyValuePair<string, string>("preferredbehaviour", "deferredfeedback"),
+        new KeyValuePair<string, string>("attempts", "0"), // unlimited attempts
+        new KeyValuePair<string, string>("grademethod", "1"), // highest grade
+        new KeyValuePair<string, string>("decimalpoints", "2"),
+        new KeyValuePair<string, string>("questiondecimalpoints", "-1"),
+        new KeyValuePair<string, string>("reviewattempt", "69888"),
+        new KeyValuePair<string, string>("reviewcorrectness", "4352"),
+        new KeyValuePair<string, string>("reviewmarks", "4352"),
+        new KeyValuePair<string, string>("reviewspecificfeedback", "4352"),
+        new KeyValuePair<string, string>("reviewgeneralfeedback", "4352"),
+        new KeyValuePair<string, string>("reviewrightanswer", "4352"),
+        new KeyValuePair<string, string>("reviewoverallfeedback", "4352"),
+        new KeyValuePair<string, string>("questionsperpage", "1"),
+        new KeyValuePair<string, string>("shuffleanswers", "1"),
+        new KeyValuePair<string, string>("grade", "10"), // maximum grade
+    });
+
+            var response = await _httpClient.PostAsync(moodleUrl, content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonConvert.DeserializeObject<MoodleQuizCreationResult>(responseContent);
+                return result?.QuizId ?? throw new Exception("Failed to get created quiz ID");
+            }
+            else
+            {
+                throw new Exception($"Failed to create Moodle quiz. Response: {responseContent}");
+            }
+        }
+
+        public class MoodleQuizCreationResult
+        {
+            [JsonProperty("quizid")]
+            public int QuizId { get; set; }
+        }
+        public async Task<List<MoodleBook>> GetMoodleBooksForCourse(int courseId)
+        {
+            var content = new FormUrlEncodedContent(new[]
+            {
+        new KeyValuePair<string, string>("wstoken", _configuration["Moodle:Token"]),
+        new KeyValuePair<string, string>("wsfunction", "mod_book_get_books_by_courses"),
+        new KeyValuePair<string, string>("moodlewsrestformat", "json"),
+        new KeyValuePair<string, string>("courseids[0]", courseId.ToString()),
+    });
+
+            var response = await _httpClient.PostAsync("", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception($"Failed to get book info: {responseContent}");
+            }
+
+            var booksResponse = JsonConvert.DeserializeObject<MoodleBooksResponse>(responseContent);
+            return booksResponse?.Books ?? new List<MoodleBook>();
+        }
+        public async Task<string> GetBookContentAsync(int courseId, int? bookId = null)
+        {
+            try
+            {
+                var content = new FormUrlEncodedContent(new[]
+                {
+            new KeyValuePair<string, string>("wstoken", _configuration["Moodle:Token"]),
+            new KeyValuePair<string, string>("wsfunction", "mod_book_get_books_by_courses"),
+            new KeyValuePair<string, string>("moodlewsrestformat", "json"),
+            new KeyValuePair<string, string>("courseids[0]", courseId.ToString()),
+        });
+
+                var response = await _httpClient.PostAsync("", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception($"Failed to get book info: {responseContent}");
+                }
+
+                var booksResponse = JsonConvert.DeserializeObject<MoodleBooksResponse>(responseContent);
+                var book = bookId.HasValue
+                    ? booksResponse?.Books?.FirstOrDefault(b => b.Id == bookId.Value)
+                    : booksResponse?.Books?.FirstOrDefault(); // Select first book if bookId is not provided
+
+                if (book == null)
+                {
+                    throw new Exception("Book not found in course");
+                }
+
+                // Get book chapters
+                var chaptersContent = new FormUrlEncodedContent(new[]
+                {
+            new KeyValuePair<string, string>("wstoken", _configuration["Moodle:Token"]),
+            new KeyValuePair<string, string>("wsfunction", "mod_book_get_book_chapters"),
+            new KeyValuePair<string, string>("moodlewsrestformat", "json"),
+            new KeyValuePair<string, string>("bookid", book.Id.ToString()),
+        });
+
+                var chaptersResponse = await _httpClient.PostAsync("", chaptersContent);
+                var chaptersResponseContent = await chaptersResponse.Content.ReadAsStringAsync();
+
+                if (!chaptersResponse.IsSuccessStatusCode)
+                {
+                    throw new Exception($"Failed to get book chapters: {chaptersResponseContent}");
+                }
+
+                var chapters = JsonConvert.DeserializeObject<MoodleBookChaptersResponse>(chaptersResponseContent);
+
+                // Format the content for display
+                var formattedContent = FormatBookContent(book, chapters?.Chapters);
+
+                return formattedContent;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting book content");
+                throw;
+            }
+        }
+
+        private string FormatBookContent(MoodleBook book, List<MoodleBookChapter> chapters)
+        {
+            if (chapters == null || !chapters.Any())
+            {
+                return book.Intro ?? "No content available for this book.";
+            }
+
+            var htmlContent = new System.Text.StringBuilder();
+            htmlContent.Append($"<h1>{book.Name}</h1>");
+
+            if (!string.IsNullOrEmpty(book.Intro))
+            {
+                htmlContent.Append($"<div class='book-intro'>{book.Intro}</div>");
+            }
+
+            htmlContent.Append("<ul class='book-chapters'>");
+            foreach (var chapter in chapters.OrderBy(c => c.ChapterNumber))
+            {
+                htmlContent.Append($"<li><h2>{chapter.Title}</h2>");
+                htmlContent.Append($"<div class='chapter-content'>{chapter.Content}</div></li>");
+            }
+            htmlContent.Append("</ul>");
+
+            return htmlContent.ToString();
+        }
+    }
+
+    // Add these DTO classes to your project
+    public class MoodleBooksResponse
+    {
+        [JsonProperty("books")]
+        public List<MoodleBook> Books { get; set; }
+    }
+
+    public class MoodleBook
+    {
+        [JsonProperty("id")]
+        public int Id { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("intro")]
+        public string Intro { get; set; }
+
+        [JsonProperty("introformat")]
+        public int IntroFormat { get; set; }
+    }
+
+    public class MoodleBookChaptersResponse
+    {
+        [JsonProperty("chapters")]
+        public List<MoodleBookChapter> Chapters { get; set; }
+    }
+
+    public class MoodleBookChapter
+    {
+        [JsonProperty("id")]
+        public int Id { get; set; }
+
+        [JsonProperty("title")]
+        public string Title { get; set; }
+
+        [JsonProperty("content")]
+        public string Content { get; set; }
+
+        [JsonProperty("chapter")]
+        public int ChapterNumber { get; set; }
+    
 }
+
+
+
+
 }

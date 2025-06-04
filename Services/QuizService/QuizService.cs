@@ -60,5 +60,36 @@ public class QuizService: IQuizService
 
         return quizDetails;
     }
- 
+
+    // In QuizService.cs
+    public async Task<List<Test>> GetTestsByCourseAndMoodleQuizIdAsync(int courseId, int? moodleQuizId = null)
+    {
+        try
+        {
+            var query = _context.Tests
+                .Include(t => t.Course)
+                .Include(t => t.Questions)
+                .Where(t => t.CourseId == courseId);
+
+            if (moodleQuizId.HasValue)
+            {
+                query = query.Where(t => t.MoodleQuizId == moodleQuizId.Value);
+            }
+
+            var tests = await query.ToListAsync();
+
+            if (!tests.Any())
+            {
+                return new List<Test>(); // Return empty list instead of throwing
+            }
+
+            return tests;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Error fetching tests for CourseId {courseId} and MoodleQuizId {moodleQuizId}: {ex.Message}");
+        }
+    }
+
+
 }
