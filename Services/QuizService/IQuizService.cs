@@ -9,5 +9,6 @@ namespace Career_Tracker_Backend.Services.QuizService
     {
         Task<List<QuizQuestionDetail>> GetTestQuestionsAsync(int testId);
         Task<List<Test>> GetTestsByCourseAndMoodleQuizIdAsync(int courseId, int? moodleQuizId = null);
+
     }
 }

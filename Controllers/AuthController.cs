@@ -1,6 +1,7 @@
 ﻿using Career_Tracker_Backend.Models;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -25,7 +26,9 @@ namespace Career_Tracker_Backend.Controllers
         [HttpPost("login")]
         public IActionResult Login([FromBody] LoginRequest request)
         {
-            var user = _context.Users.FirstOrDefault(u => u.Username == request.Username);
+            var user = _context.Users
+                .Include(u => u.Role) // Load Role entity
+                .FirstOrDefault(u => u.Username == request.Username);
 
             if (user == null || !user.VerifyPassword(request.Password))
                 return Unauthorized(new { message = "Invalid username or password" });
@@ -59,7 +62,8 @@ namespace Career_Tracker_Backend.Controllers
             {
                 Message = "Login successful",
                 Username = user.Username,
-                UserId = user.UserId
+                UserId = user.UserId,
+                role = user.Role?.RoleName.ToString() ?? "Unknown" // Use Role.RoleName as string
             });
         }
 

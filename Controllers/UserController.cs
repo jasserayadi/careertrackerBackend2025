@@ -83,7 +83,7 @@ namespace Career_Tracker_Backend.Controllers
                         u.Lastname,
                         u.Email,
                         u.DateCreation,
-                        Role = u.Role != null ? new { u.Role.RoleName } : null,
+                        Role = u.Role != null ? new { RoleName = u.Role.RoleName.ToString() } : null,
                         CV = u.CV != null ? new { u.CV.CvFile } : null,
                         Job = u.Job != null ? new { u.Job.JobId, u.Job.JobName } : null
                     })

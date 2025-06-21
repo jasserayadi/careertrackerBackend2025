@@ -1,5 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
 
 namespace Career_Tracker_Backend.Models
 {
@@ -17,10 +18,7 @@ namespace Career_Tracker_Backend.Models
         public string Summary { get; set; } // Formation description
 
         // Moodle-specific fields
-
-        public int MoodleCategoryId  { get; set; } // Maps to Moodle's course category ID
-
-
+        public int MoodleCategoryId { get; set; } // Maps to Moodle's course category ID
         public int MoodleCourseId { get; set; } // Maps to Moodle's parent course ID (if applicable)
 
         // Timestamps
@@ -29,13 +27,18 @@ namespace Career_Tracker_Backend.Models
 
         // Relationships
         [ForeignKey("CategoryFk")]
-        public virtual Category?Category { get; set; }
+        public virtual Category? Category { get; set; }
 
-          
+        public virtual ICollection<Course>? Courses { get; set; } // One-to-many with Course (levels)
 
-        public virtual ICollection<Course>?Courses { get; set; } // One-to-many with Course (levels)
+        public virtual ICollection<User>? Users { get; set; } // Navigation property (likely via Inscriptions)
 
-        public virtual ICollection<User>? Users { get; set; } // Navigation property
-     
+        // Navigation property for Inscriptions
+        public virtual ICollection<Inscription>? Inscriptions { get; set; } // One-to-many with Inscription
     }
 }
+
+
+
+
+

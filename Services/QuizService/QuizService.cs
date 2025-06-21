@@ -13,11 +13,12 @@ public class QuizService: IQuizService
 {
     private readonly ApplicationDbContext _context;
     private readonly IMoodleService _moodleService;
-
-    public QuizService(ApplicationDbContext context, IMoodleService moodleService)
+    private readonly ILogger<QuizService> _logger;
+    public QuizService(ApplicationDbContext context, IMoodleService moodleService, ILogger<QuizService> logger)
     {
         _context = context;
         _moodleService = moodleService;
+        _logger = logger;
     }
 
     // Method to get quiz questions for a specific test
@@ -66,10 +67,19 @@ public class QuizService: IQuizService
     {
         try
         {
+            if (courseId <= 0)
+            {
+                throw new ArgumentException("CourseId must be a positive integer.", nameof(courseId));
+            }
             var query = _context.Tests
                 .Include(t => t.Course)
                 .Include(t => t.Questions)
                 .Where(t => t.CourseId == courseId);
+
+            if (moodleQuizId.HasValue && moodleQuizId.Value <= 0)
+            {
+                throw new ArgumentException("MoodleQuizId must be a positive integer.", nameof(moodleQuizId));
+            }
 
             if (moodleQuizId.HasValue)
             {
@@ -87,9 +97,11 @@ public class QuizService: IQuizService
         }
         catch (Exception ex)
         {
-            throw new Exception($"Error fetching tests for CourseId {courseId} and MoodleQuizId {moodleQuizId}: {ex.Message}");
+            _logger.LogError(ex, "Error fetching tests for CourseId {CourseId} and MoodleQuizId {MoodleQuizId}", courseId, moodleQuizId);
+            throw; // Let the controller handle the exception and return 400 or 500
         }
     }
+
 
 
 }

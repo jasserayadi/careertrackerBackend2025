@@ -24,7 +24,7 @@ public class Question
     [MaxLength(50)]
     public string QuestionType { get; set; }
 
-    public int TestFk { get; set; } // Match MySQL int (NOT NULL)
+    public int? TestFk { get; set; } // Match MySQL int (NOT NULL)
 
     [ForeignKey("TestFk")]
     public Test Test { get; set; }

@@ -32,11 +32,27 @@ namespace Career_Tracker_Backend
         public float MatchScore { get; set; }
     }
 
+    public class LearningStep
+    {
+        public string Step { get; set; }
+        public string Description { get; set; }
+        public int Priority { get; set; }
+        public int EstimatedHours { get; set; }
+    }
+
+    public class AiLearningPath
+    {
+        public string Skill { get; set; }
+        public List<LearningStep> Steps { get; set; }
+        public int TotalEstimatedHours { get; set; }
+    }
+
     public class LearningPath
     {
         public List<string> MatchedSkills { get; set; }
         public List<string> MissingSkills { get; set; }
         public List<FormationRecommendation> RecommendedFormations { get; set; }
+        public List<AiLearningPath> AiLearningPaths { get; set; }
     }
 
     public class FormationRecommendationResponse
@@ -63,7 +79,6 @@ namespace Career_Tracker_Backend
             _context = context;
             _logger = logger;
 
-            // Ensure base address is set
             if (_httpClient.BaseAddress == null)
             {
                 _httpClient.BaseAddress = new Uri("http://localhost:8000");
@@ -75,8 +90,6 @@ namespace Career_Tracker_Backend
             try
             {
                 _logger.LogInformation($"Starting job recommendation for user {userId}");
-
-                // Get user's CV with fallback for empty skills/experiences
                 var cv = await _context.CVs.FirstOrDefaultAsync(c => c.UserId == userId);
                 if (cv == null)
                 {
@@ -84,14 +97,12 @@ namespace Career_Tracker_Backend
                     return new List<JobRecommendation>();
                 }
 
-                // Ensure skills and experiences are properly deserialized
                 var userSkills = cv.Skills ?? new List<string>();
                 var userExperiences = cv.Experiences ?? new List<string>();
 
                 _logger.LogInformation($"User skills: {JsonSerializer.Serialize(userSkills)}");
                 _logger.LogInformation($"User experiences: {JsonSerializer.Serialize(userExperiences)}");
 
-                // Get all jobs with their required skills
                 var jobs = await _context.Jobs
                     .Select(j => new
                     {
@@ -104,7 +115,6 @@ namespace Career_Tracker_Backend
 
                 _logger.LogInformation($"Found {jobs.Count} jobs to evaluate");
 
-                // Prepare request for ML service
                 var request = new
                 {
                     user_skills = userSkills,
@@ -120,7 +130,6 @@ namespace Career_Tracker_Backend
 
                 _logger.LogDebug($"Sending request to ML service: {JsonSerializer.Serialize(request)}");
 
-                // Call ML service
                 var response = await _httpClient.PostAsJsonAsync("recommend-jobs", request);
 
                 if (!response.IsSuccessStatusCode)
@@ -132,7 +141,6 @@ namespace Career_Tracker_Backend
 
                 var result = await response.Content.ReadFromJsonAsync<List<JobRecommendation>>();
 
-                // Process results
                 var recommendations = result?
                     .Where(r => r != null && r.JobId != 0)
                     .OrderByDescending(r => r.MatchScore)
@@ -140,7 +148,6 @@ namespace Career_Tracker_Backend
 
                 _logger.LogInformation($"Returning {recommendations.Count} job recommendations");
 
-                // Enhance recommendations with additional data
                 foreach (var rec in recommendations)
                 {
                     var job = jobs.FirstOrDefault(j => j.JobId == rec.JobId);
@@ -283,6 +290,74 @@ namespace Career_Tracker_Backend
             }
         }
 
+        public async Task<List<AiLearningPath>> GenerateAiLearningPathAsync(int userId, List<string> missingSkills)
+        {
+            try
+            {
+                _logger.LogInformation($"Generating AI learning path for user {userId} with missing skills: {JsonSerializer.Serialize(missingSkills)}");
+
+                if (!missingSkills.Any())
+                {
+                    _logger.LogInformation("No missing skills to base learning path on");
+                    return new List<AiLearningPath>();
+                }
+
+                var cv = await _context.CVs.FirstOrDefaultAsync(c => c.UserId == userId);
+                var userSkills = cv?.Skills ?? new List<string>();
+
+                var learningPathRequest = new
+                {
+                    missing_skills = missingSkills,
+                    user_skills = userSkills
+                };
+
+                var response = await _httpClient.PostAsJsonAsync("generate-learning-path", learningPathRequest);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError($"FastAPI service returned {response.StatusCode}: {errorContent}");
+                    return new List<AiLearningPath>();
+                }
+
+                var learningPaths = await response.Content.ReadFromJsonAsync<List<AiLearningPath>>();
+
+                var results = learningPaths?
+                    .Select(lp => new AiLearningPath
+                    {
+                        Skill = lp.Skill,
+                        Steps = lp.Steps?.Select(s => new LearningStep
+                        {
+                            Step = s.Step,
+                            Description = s.Description,
+                            Priority = s.Priority,
+                            EstimatedHours = s.EstimatedHours
+                        }).ToList() ?? new List<LearningStep>(),
+                        TotalEstimatedHours = lp.TotalEstimatedHours
+                    })
+                    .ToList() ?? new List<AiLearningPath>();
+
+                _logger.LogInformation($"Returning {results.Count} AI learning paths");
+
+                return results;
+            }
+            catch (HttpRequestException httpEx)
+            {
+                _logger.LogError(httpEx, "HTTP error calling FastAPI for AI learning path");
+                return new List<AiLearningPath>();
+            }
+            catch (JsonException jsonEx)
+            {
+                _logger.LogError(jsonEx, "Error parsing FastAPI response for AI learning path");
+                return new List<AiLearningPath>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error in AI learning path generation");
+                return new List<AiLearningPath>();
+            }
+        }
+
         public async Task<LearningPath> GetLearningPathAsync(int userId)
         {
             try
@@ -303,7 +378,8 @@ namespace Career_Tracker_Backend
                 {
                     MatchedSkills = new List<string>(),
                     MissingSkills = new List<string>(),
-                    RecommendedFormations = new List<FormationRecommendation>()
+                    RecommendedFormations = new List<FormationRecommendation>(),
+                    AiLearningPaths = new List<AiLearningPath>()
                 };
 
                 if (user.Job == null)
@@ -319,9 +395,10 @@ namespace Career_Tracker_Backend
                 if (missingSkills.Any())
                 {
                     learningPath.RecommendedFormations = await RecommendFormationsAsync(userId, missingSkills);
+                    learningPath.AiLearningPaths = await GenerateAiLearningPathAsync(userId, missingSkills);
                 }
 
-                _logger.LogInformation($"Learning path generated with {learningPath.RecommendedFormations.Count} formations");
+                _logger.LogInformation($"Learning path generated with {learningPath.RecommendedFormations.Count} formations and {learningPath.AiLearningPaths.Count} AI learning paths");
 
                 return learningPath;
             }
@@ -331,7 +408,5 @@ namespace Career_Tracker_Backend
                 throw;
             }
         }
-
-
     }
 }

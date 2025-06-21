@@ -1,5 +1,6 @@
 ﻿using Career_Tracker_Backend.Models;
 using Career_Tracker_Backend.Services.JobService;
+using Career_Tracker_Backend.Services.UserServices;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Career_Tracker_Backend.Controllers
@@ -9,10 +10,12 @@ namespace Career_Tracker_Backend.Controllers
     public class JobController : ControllerBase
     {
         private readonly IJobService _jobService;
+        private readonly ILogger<UserService> _logger;
 
-        public JobController(IJobService jobService)
+        public JobController(IJobService jobService, ILogger<UserService> logger)
         {
             _jobService = jobService;
+            _logger = logger;
         }
 
 
@@ -81,6 +84,54 @@ namespace Career_Tracker_Backend.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, ex.Message);
+            }
+        }
+        [HttpGet("{jobId}/users")]
+        public async Task<IActionResult> GetUsersByJobId(int jobId)
+        {
+            try
+            {
+                _logger.LogInformation($"Request received for users with JobId: {jobId}");
+                var users = await _jobService.GetUsersByJobIdAsync(jobId);
+                if (users.Count == 0)
+                {
+                    _logger.LogInformation($"No users found for JobId: {jobId}");
+                    return NotFound(new { Message = $"No users found for JobId: {jobId}" });
+                }
+                _logger.LogInformation($"Returning {users.Count} users for JobId: {jobId}");
+                return Ok(users);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                _logger.LogWarning(ex, $"Invalid JobId: {jobId}");
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retrieving users for JobId: {jobId}");
+                return StatusCode(500, new { Message = "An error occurred while retrieving users", Error = ex.Message });
+            }
+        }
+        // In JobController.cs
+        [HttpGet("users/{userId}/job")]
+        public async Task<IActionResult> GetJobByUserId(int userId)
+        {
+            try
+            {
+                _logger.LogInformation($"Request received for job with UserId: {userId}");
+                var job = await _jobService.GetJobByUserIdAsync(userId);
+                if (job == null)
+                {
+                    _logger.LogInformation($"No job found for UserId: {userId}");
+                    return NotFound(new { Message = $"No job found for UserId: {userId}" });
+                }
+                _logger.LogInformation($"Returning job {job.JobId} for UserId: {userId}");
+                return Ok(job);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retrieving job for UserId: {userId}");
+                return StatusCode(500, new { Message = "An error occurred while retrieving the job", Error = ex.Message });
             }
         }
     }

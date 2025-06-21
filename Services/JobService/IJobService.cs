@@ -9,5 +9,8 @@ namespace Career_Tracker_Backend.Services.JobService
         Task<List<JobDto>> GetJobsAsync();
         Task<bool> DeleteJobAsync(int jobId);
         Task<Job?> UpdateJobAsync(int jobId, Job jobUpdate);
+        Task<List<User>> GetUsersByJobIdAsync(int jobId);
+        Task<JobDto?> GetJobByUserIdAsync(int userId);
+
     }
 }

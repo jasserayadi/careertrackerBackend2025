@@ -28,5 +28,7 @@ namespace Career_Tracker_Backend.Services.UserServices
         Task<string> GetBookContentAsync(int courseId, int? bookId = null);
 
         Task<List<MoodleBook>> GetMoodleBooksForCourse(int courseId);
+        Task<bool> DeleteMoodleCourseAsync(int courseId);
+      
     }
 }

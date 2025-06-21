@@ -50,7 +50,13 @@ namespace Career_Tracker_Backend
            j => j.HasOne<Formation>().WithMany().HasForeignKey("FormationId"),
            j => j.HasOne<User>().WithMany().HasForeignKey("UserId"),
            j => j.ToTable("FormationUser"));
+            modelBuilder.Entity<Question>()
+          .HasOne(q => q.Test)
+          .WithMany(t => t.Questions)
+          .HasForeignKey(q => q.TestFk)
+          .OnDelete(DeleteBehavior.Restrict); // Prevent cascade delete
 
+            
             // Supprimez cette relation si elle existe
             // modelBuilder.Entity<Category>()
             //     .HasMany(c => c.Courses)

@@ -14,8 +14,12 @@ using Career_Tracker_Backend.Services.CourseService;
 using Career_Tracker_Backend.Services.QuizService;
 using Career_Tracker_Backend.Services.InscriptionService;
 using Career_Tracker_Backend.Services.CertificateService;
+
 using Career_Tracker_Backend.Services;
 using System.Net.Http.Headers;
+using Career_Tracker_Backend.Services.Interfaces;
+using Resend;
+
 
 
 
@@ -84,8 +88,18 @@ builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IQuizService, QuizService>();
 builder.Services.AddScoped<IInscriptionService, InscriptionService>();
 builder.Services.AddScoped<ICertificateService, CertificateService>();
+builder.Services.AddScoped<IFeedbackService, FeedbackService>();
+builder.Services.AddScoped<IBadgeService, BadgeService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+//builder.Services.AddScoped<Career_Tracker_Backend.IFeedbackService, Career_Tracker_Backend.FeedbackService>();
+builder.Services.AddOptions();
+builder.Services.AddHttpClient<ResendClient>();
+builder.Services.Configure<ResendClientOptions>(options =>
+{
+    options.ApiToken = Environment.GetEnvironmentVariable("RESEND_APITOKEN") ?? "re_jg6TAGsk_FGsUNnENDDkFHHUjmFiwA7oX"; // Fallback to hardcoded key
+});
+builder.Services.AddTransient<IResend, ResendClient>();
 
-//builder.Services.AddScoped<ICvService, CvService>();
 // In Program.cs, update your HttpClient configuration
 builder.Services.AddHttpClient<ICvService, CvService>(client =>
 {

@@ -7,6 +7,8 @@ namespace Career_Tracker_Backend.Services.FormationService
     {
    
          Task SyncFormationsAsync();
-      //  Task<int> CreateFullFormationAsync(Formation formation);
+        Task DeleteFormationAndMoodleCourseAsync(int formationId);
+
+        //  Task<int> CreateFullFormationAsync(Formation formation);
     }
 }

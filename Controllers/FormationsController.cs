@@ -56,104 +56,119 @@ namespace Career_Tracker_Backend.Controllers
             }
         }
 
-/*[HttpPost]
-        public async Task<IActionResult> CreateFullFormation([FromBody] Formation formation)
-        {
-            try
-            {
-                if (!ModelState.IsValid)
+        /*[HttpPost]
+                public async Task<IActionResult> CreateFullFormation([FromBody] Formation formation)
                 {
-                    return BadRequest(ModelState);
-                }
-
-                var moodleCourseId = await _formationService.CreateFullFormationAsync(formation);
-
-                if (formation.FormationId == 0)
-                {
-                    _context.Formations.Add(formation);
-                    await _context.SaveChangesAsync();
-                }
-
-                return CreatedAtAction(
-                    nameof(GetFormation),
-                    new { id = formation.FormationId },
-                    new
+                    try
                     {
-                        FormationId = formation.FormationId,
-                        MoodleCourseId = moodleCourseId,
-                        Message = "Formation created successfully"
-                    });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error creating formation");
-                return StatusCode(500, new
-                {
-                    Error = "Failed to create formation",
-                    Details = ex.Message
-                });
-            }
-        }
+                        if (!ModelState.IsValid)
+                        {
+                            return BadRequest(ModelState);
+                        }
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetFormation(int id)
+                        var moodleCourseId = await _formationService.CreateFullFormationAsync(formation);
+
+                        if (formation.FormationId == 0)
+                        {
+                            _context.Formations.Add(formation);
+                            await _context.SaveChangesAsync();
+                        }
+
+                        return CreatedAtAction(
+                            nameof(GetFormation),
+                            new { id = formation.FormationId },
+                            new
+                            {
+                                FormationId = formation.FormationId,
+                                MoodleCourseId = moodleCourseId,
+                                Message = "Formation created successfully"
+                            });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error creating formation");
+                        return StatusCode(500, new
+                        {
+                            Error = "Failed to create formation",
+                            Details = ex.Message
+                        });
+                    }
+                }
+
+                [HttpGet("{id}")]
+                public async Task<IActionResult> GetFormation(int id)
+                {
+                    try
+                    {
+                        var formation = await _context.Formations
+                            .Include(f => f.Courses)
+                                .ThenInclude(c => c.Test)
+                                    .ThenInclude(t => t.Questions)
+                            .FirstOrDefaultAsync(f => f.FormationId == id);
+
+                        if (formation == null)
+                        {
+                            return NotFound();
+                        }
+
+                        return Ok(formation);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Error getting formation with ID {id}");
+                        return StatusCode(500, "Internal server error");
+                    }
+                }
+
+                [HttpPut("{id}")]
+                public async Task<IActionResult> UpdateFormation(int id, [FromBody] Formation updatedFormation)
+                {
+                    try
+                    {
+                        if (id != updatedFormation.FormationId)
+                        {
+                            return BadRequest("ID mismatch");
+                        }
+
+                        var existingFormation = await _context.Formations
+                            .Include(f => f.Courses)
+                            .FirstOrDefaultAsync(f => f.FormationId == id);
+
+                        if (existingFormation == null)
+                        {
+                            return NotFound();
+                        }
+
+                        existingFormation.Fullname = updatedFormation.Fullname;
+                        existingFormation.Shortname = updatedFormation.Shortname;
+                        existingFormation.Summary = updatedFormation.Summary;
+                        existingFormation.MoodleCategoryId = updatedFormation.MoodleCategoryId;
+                        existingFormation.UpdatedAt = DateTime.UtcNow;
+
+                        await _context.SaveChangesAsync();
+
+                        return NoContent();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Error updating formation with ID {id}");
+                        return StatusCode(500, "Internal server error");
+                    }
+                }*/
+        [HttpDelete("{formationId}")]
+        public async Task<IActionResult> DeleteFormation(int formationId)
         {
             try
             {
-                var formation = await _context.Formations
-                    .Include(f => f.Courses)
-                        .ThenInclude(c => c.Test)
-                            .ThenInclude(t => t.Questions)
-                    .FirstOrDefaultAsync(f => f.FormationId == id);
-
-                if (formation == null)
-                {
-                    return NotFound();
-                }
-
-                return Ok(formation);
+                await _formationService.DeleteFormationAndMoodleCourseAsync(formationId);
+                return Ok($"Formation with ID {formationId}, its inscriptions, courses, and Moodle course deleted successfully.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error getting formation with ID {id}");
-                return StatusCode(500, "Internal server error");
+                _logger.LogError(ex, $"Error deleting formation with ID {formationId}");
+                return StatusCode(500, $"Error: {ex.Message}");
             }
         }
-
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateFormation(int id, [FromBody] Formation updatedFormation)
-        {
-            try
-            {
-                if (id != updatedFormation.FormationId)
-                {
-                    return BadRequest("ID mismatch");
-                }
-
-                var existingFormation = await _context.Formations
-                    .Include(f => f.Courses)
-                    .FirstOrDefaultAsync(f => f.FormationId == id);
-
-                if (existingFormation == null)
-                {
-                    return NotFound();
-                }
-
-                existingFormation.Fullname = updatedFormation.Fullname;
-                existingFormation.Shortname = updatedFormation.Shortname;
-                existingFormation.Summary = updatedFormation.Summary;
-                existingFormation.MoodleCategoryId = updatedFormation.MoodleCategoryId;
-                existingFormation.UpdatedAt = DateTime.UtcNow;
-
-                await _context.SaveChangesAsync();
-
-                return NoContent();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error updating formation with ID {id}");
-                return StatusCode(500, "Internal server error");
-            }
-        }*/
     }
+
 }

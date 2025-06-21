@@ -67,12 +67,12 @@ public class QuizController : ControllerBase
             await _moodleService.SaveQuizDataAsync(courseId, userId);
 
             _logger.LogInformation($"Successfully saved quizzes for course ID: {courseId} and user ID: {userId}");
-            return Ok("Quizzes saved successfully.");
+            return Ok(new { message = "Quizzes saved successfully." });
         }
         catch (Exception ex)
         {
             _logger.LogError($"Error saving quizzes for course ID {courseId}: {ex.Message}");
-            return StatusCode(500, $"Internal server error: {ex.Message}");
+            return StatusCode(500, new { message = $"Internal server error: {ex.Message}" });
         }
     }
 
@@ -96,6 +96,7 @@ public class QuizController : ControllerBase
                 {
                     errorMessage += $" and MoodleQuizId {moodleQuizId.Value}";
                 }
+
                 _logger.LogWarning(errorMessage);
                 return NotFound(errorMessage);
             }
@@ -116,11 +117,16 @@ public class QuizController : ControllerBase
 
             return Ok(simplifiedResponse);
         }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid input parameters for CourseId {CourseId} and MoodleQuizId {MoodleQuizId}", courseId, moodleQuizId);
+            return BadRequest(new { message = ex.Message });
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error fetching tests for CourseId {CourseId} and MoodleQuizId {MoodleQuizId}",
-                courseId, moodleQuizId);
+            _logger.LogError(ex, "Error fetching tests for CourseId {CourseId} and MoodleQuizId {MoodleQuizId}", courseId, moodleQuizId);
             return StatusCode(500, "An error occurred while fetching tests.");
         }
     }
+
 }
