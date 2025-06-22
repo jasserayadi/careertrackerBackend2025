@@ -43,6 +43,7 @@ builder.Services.AddCors(options =>
               .AllowCredentials();
     });
 });
+
 // Configure database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -79,7 +80,7 @@ builder.Services.AddAuthentication(options =>
 });
 
 // Register services
-builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddHttpClient<IMoodleService, MoodleService>();
 builder.Services.AddScoped<IJobService, JobService>();

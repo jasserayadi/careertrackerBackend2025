@@ -53,7 +53,7 @@ namespace Career_Tracker_Backend.Models
 
         public bool VerifyPassword(string password)
         {
-            return Password == password; // Replace with hashed password verification
+            return BCrypt.Net.BCrypt.Verify(password, Password);
         }
         public int? MoodleUserId { get; set; } // Nullable by mysql command
     }

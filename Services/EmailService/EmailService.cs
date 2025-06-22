@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
-using Resend;
+using System.Net.Mail;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace Career_Tracker_Backend.Services
 {
@@ -11,46 +12,61 @@ namespace Career_Tracker_Backend.Services
 
     public class EmailService : IEmailService
     {
-        private readonly IResend _resend;
+        private readonly IConfiguration _configuration;
         private readonly ILogger<EmailService> _logger;
 
-        public EmailService(IResend resend, ILogger<EmailService> logger)
+        public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
         {
-            _resend = resend ?? throw new ArgumentNullException(nameof(resend));
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             _logger = logger;
         }
 
         public async Task SendEmailAsync(string toEmail, string subject, string body)
         {
-            var fromEmail = "onboarding@resend.dev"; // Replace with verified custom domain email if available
-            if (string.IsNullOrEmpty(fromEmail))
+            var smtpSettings = _configuration.GetSection("SmtpSettings");
+            var fromEmail = smtpSettings["SenderEmail"];
+            var host = smtpSettings["Host"];
+            var port = int.Parse(smtpSettings["Port"]);
+            var username = smtpSettings["Username"];
+            var password = smtpSettings["Password"];
+            var enableSsl = bool.Parse(smtpSettings["EnableSsl"]);
+
+            if (string.IsNullOrEmpty(fromEmail) || string.IsNullOrEmpty(host))
             {
-                _logger.LogError("Resend FromEmail is not configured.");
+                _logger.LogError("SMTP configuration is incomplete.");
                 throw new Exception("Email configuration is missing.");
             }
 
-            var message = new EmailMessage
+            var message = new MailMessage
             {
-                From = fromEmail,
-                To = { toEmail }, // Use collection for multiple recipients if needed
+                From = new MailAddress(fromEmail, "Career Tracker"),
                 Subject = subject,
-                HtmlBody = $"<h2>Welcome to Career Tracker!</h2><p>{body}</p>"
+                IsBodyHtml = true,
+                Body = $"<h2>Welcome to Career Tracker!</h2><p>{body}</p>"
             };
+            message.To.Add(toEmail);
 
-            try
+            using (var client = new SmtpClient(host, port)
             {
-                var response = await _resend.EmailSendAsync(message);
-                _logger.LogInformation("Email sent successfully to {ToEmail} with ID {EmailId}", toEmail, response.Content);
-            }
-            catch (ResendException ex)
+                Credentials = new System.Net.NetworkCredential(username, password),
+                EnableSsl = enableSsl
+            })
             {
-                _logger.LogError(ex, "Failed to send email to {ToEmail}: {Message}", toEmail, ex.Message);
-                throw new Exception($"Email sending failed: {ex.Message}", ex);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send email to {ToEmail}", toEmail);
-                throw;
+                try
+                {
+                    await client.SendMailAsync(message);
+                    _logger.LogInformation("Email sent successfully to {ToEmail}", toEmail);
+                }
+                catch (SmtpException ex)
+                {
+                    _logger.LogError(ex, "Failed to send email to {ToEmail}: {Message}", toEmail, ex.Message);
+                    throw new Exception($"Email sending failed: {ex.Message}", ex);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to send email to {ToEmail}", toEmail);
+                    throw;
+                }
             }
         }
     }

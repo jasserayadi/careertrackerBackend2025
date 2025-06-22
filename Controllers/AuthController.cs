@@ -1,4 +1,5 @@
 ﻿using Career_Tracker_Backend.Models;
+using Career_Tracker_Backend.Services.UserServices;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,9 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.Mvc.Controllers;
 
 namespace Career_Tracker_Backend.Controllers
 {
@@ -16,33 +20,104 @@ namespace Career_Tracker_Backend.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly IAuthService _authService;
 
-        public AuthController(ApplicationDbContext context, IConfiguration configuration)
+        // Static instance of CustomCorsFilter since DI registration isn't available
+        private static readonly CustomCorsFilter _corsFilter = new CustomCorsFilter();
+
+        public AuthController(
+            ApplicationDbContext context,
+            IConfiguration configuration,
+            IAuthService authService)
         {
             _context = context;
             _configuration = configuration;
+            _authService = authService;
+        }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            try
+            {
+                var result = await _authService.SendPasswordResetEmailAsync(request.Email);
+                // Always return OK to prevent email enumeration
+                return Ok(new { message = "If an account exists with this email, a password reset link has been sent." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while processing your request." });
+            }
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            try
+            {
+                var result = await _authService.ResetPasswordAsync(
+                    request.Token,
+                    request.NewPassword,
+                    request.ConfirmPassword);
+
+                if (!result)
+                {
+                    return BadRequest(new { message = "Invalid or expired reset token." });
+                }
+
+                return Ok(new { message = "Password reset successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("validate-reset-token")]
+        public async Task<IActionResult> ValidateResetToken([FromBody] ValidateTokenRequest request)
+        {
+            // Create action arguments dictionary (empty for this case)
+            var actionArguments = new Dictionary<string, object?>
+            {
+                { "request", request }
+            };
+
+            // Apply CORS manually
+            _corsFilter.OnActionExecuting(new ActionExecutingContext(
+                new ActionContext(HttpContext, new RouteData(), new ControllerActionDescriptor()),
+                new List<IFilterMetadata>(),
+                actionArguments,
+                this
+            ));
+
+            try
+            {
+                var isValid = await _authService.ValidateResetTokenAsync(request.Token);
+                return Ok(new { isValid });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while validating the token." });
+            }
         }
 
         [HttpPost("login")]
         public IActionResult Login([FromBody] LoginRequest request)
         {
-            var user = _context.Users
-                .Include(u => u.Role) // Load Role entity
-                .FirstOrDefault(u => u.Username == request.Username);
+            var user = _authService.Authenticate(request.Username, request.Password);
 
-            if (user == null || !user.VerifyPassword(request.Password))
+            if (user == null)
                 return Unauthorized(new { message = "Invalid username or password" });
 
-            var token = GenerateJwtToken(user);
+            var token = _authService.GenerateJwtToken(user);
 
-            // Set secure HTTP-only cookies
             Response.Cookies.Append(
                 "userId",
                 user.UserId.ToString(),
                 new CookieOptions
                 {
                     HttpOnly = true,
-                    Secure = true, // Enable in production
+                    Secure = true,
                     SameSite = SameSiteMode.Strict,
                     Expires = DateTime.UtcNow.AddDays(7)
                 });
@@ -53,7 +128,7 @@ namespace Career_Tracker_Backend.Controllers
                 new CookieOptions
                 {
                     HttpOnly = true,
-                    Secure = true, // Enable in production
+                    Secure = true,
                     SameSite = SameSiteMode.Strict,
                     Expires = DateTime.UtcNow.AddDays(7)
                 });
@@ -63,7 +138,7 @@ namespace Career_Tracker_Backend.Controllers
                 Message = "Login successful",
                 Username = user.Username,
                 UserId = user.UserId,
-                role = user.Role?.RoleName.ToString() ?? "Unknown" // Use Role.RoleName as string
+                role = user.Role?.RoleName.ToString() ?? "Unknown"
             });
         }
 
@@ -76,7 +151,6 @@ namespace Career_Tracker_Backend.Controllers
                 return Unauthorized();
             }
 
-            // Validate token
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]);
 
@@ -118,35 +192,56 @@ namespace Career_Tracker_Backend.Controllers
             Response.Cookies.Delete("token");
             return Ok(new { message = "Logged out successfully" });
         }
-
-        private string GenerateJwtToken(User user)
-        {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
-            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-
-            var claims = new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Username),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
-                new Claim("userId", user.UserId.ToString())
-            };
-
-            var token = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: _configuration["Jwt:Audience"],
-                claims: claims,
-                expires: DateTime.Now.AddMinutes(30),
-                signingCredentials: credentials
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
     }
 
     public class LoginRequest
     {
         public string Username { get; set; }
         public string Password { get; set; }
+    }
+
+    public class ForgotPasswordRequest
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; }
+    }
+
+    public class ResetPasswordRequest
+    {
+        [Required]
+        public string Token { get; set; }
+        [Required]
+        public string NewPassword { get; set; }
+        [Required]
+        [Compare(nameof(NewPassword), ErrorMessage = "Passwords do not match")]
+        public string ConfirmPassword { get; set; }
+    }
+
+    public class ValidateTokenRequest
+    {
+        [Required]
+        public string Token { get; set; }
+    }
+
+    // Custom CORS filter as a standalone class
+    public class CustomCorsFilter : IActionFilter
+    {
+        public void OnActionExecuting(ActionExecutingContext context)
+        {
+            context.HttpContext.Response.Headers.Add("Access-Control-Allow-Origin", "http://localhost:3000");
+            context.HttpContext.Response.Headers.Add("Access-Control-Allow-Credentials", "true");
+            context.HttpContext.Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            context.HttpContext.Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Accept");
+            if (context.HttpContext.Request.Method == "OPTIONS")
+            {
+                context.Result = new StatusCodeResult(204); // Handle preflight
+            }
+        }
+
+        public void OnActionExecuted(ActionExecutedContext context)
+        {
+            // No action needed after execution
+        }
     }
 }

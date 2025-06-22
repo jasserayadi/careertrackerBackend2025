@@ -12,16 +12,18 @@ namespace Career_Tracker_Backend.Services.UserServices
         private readonly ApplicationDbContext _context;
         private readonly IMoodleService _moodleService;
         private readonly ILogger<UserService> _logger;
-        public UserService(ApplicationDbContext context, IMoodleService moodleService, ILogger<UserService> logger)
+        private readonly IEmailService _emailService;
+        public UserService(ApplicationDbContext context, IMoodleService moodleService, ILogger<UserService> logger, IEmailService emailService)
         {
             _context = context;
             _moodleService = moodleService;
             _logger = logger;
+            _emailService = emailService;
         }
 
         public async Task<bool> RegisterUser(string username, string firstname, string lastname,
-                                    string password, string confirmPassword, string email,
-                                    IFormFile cvFile)
+                            string password, string confirmPassword, string email,
+                            IFormFile cvFile)
         {
             // Check required fields
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password) ||
@@ -95,6 +97,18 @@ namespace Career_Tracker_Backend.Services.UserServices
             catch (Exception ex)
             {
                 throw new Exception($"Moodle user creation failed: {ex.Message}");
+            }
+
+            // Send welcome email
+            try
+            {
+                await _emailService.SendEmailAsync(email, "Welcome to Career Tracker",
+                    $"Dear {firstname},<br>Thank you for registering with Career Tracker. Your account has been created successfully!<br>Best regards,<br>Career Tracker Team");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send welcome email to {Email}", email);
+                // Optionally, log the error but proceed since registration is complete
             }
 
             return true;
