@@ -1,0 +1,48 @@
+replicaCount: 2
+image:
+  repository: registry.gitlab.com/jasserayadi/careertrackerbackend2025/career-tracker-backend
+  pullPolicy: Always
+  tag: "latest"
+service:
+  type: ClusterIP
+  port: 8080
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: career-tracker.local
+      paths:
+        - path: /api
+          pathType: Prefix
+env:
+  - name: ASPNETCORE_ENVIRONMENT
+    value: "Development"
+  - name: ASPNETCORE_URLS
+    value: "http://+:8080"
+  - name: ConnectionStrings__DefaultConnection
+    valueFrom:
+      secretKeyRef:
+        name: career-tracker-secrets
+        key: connection-string
+  - name: Moodle__BaseUrl
+    value: "http://moodle-service.career-tracker.svc.cluster.local/Mymoodle/webservice/rest/server.php"
+volumes:
+  - name: data-protection-keys
+    emptyDir: {}
+volumeMounts:
+  - name: data-protection-keys
+    mountPath: /home/app/.aspnet/DataProtection-Keys
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+podAnnotations: {}
+imagePullSecrets: []
+resources: {}
+serviceAccount:
+  create: true
+  annotations: {}
+  automount: true
+  name: career-tracker-backend

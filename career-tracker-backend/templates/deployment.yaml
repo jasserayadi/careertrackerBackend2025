@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "career-tracker-backend.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "career-tracker-backend.labels" . | nindent 8 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "career-tracker-backend.selectorLabels" . | nindent 12 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 12 }}
+      {{- end }}
+      labels:
+        {{- include "career-tracker-backend.selectorLabels" . | nindent 12 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env: {{ .Values.env | toYaml | nindent 14 }}
+          volumeMounts: {{ .Values.volumeMounts | toYaml | nindent 14 }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 14 }}
+          {{- end }}
+      volumes: {{ .Values.volumes | toYaml | nindent 12 }}
